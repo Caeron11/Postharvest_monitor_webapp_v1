@@ -1,0 +1,8 @@
+{
+  "name": "Postharvest Monitor",
+  "description": "Cold-chain postharvest storage monitor for room telemetry, FEFO inventory release planning, threshold rules, and excursion simulation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

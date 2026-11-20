@@ -1,0 +1,11 @@
+.aistudio
+.playwright-cli
+.vercel
+dist
+node_modules
+*.log
+.env
+.env.local
+.env.*.local
+src/**/*.test.ts
+public/assets/aistudio
