@@ -1,4 +1,5 @@
 import type {
+  AlertItem,
   CropThresholdRule,
   CropType,
   GlassSettings,
@@ -367,45 +368,47 @@ export const INITIAL_PRICE_SERIES: Record<CropType, PricePoint[]> = {
   ],
 };
 
+export const INITIAL_ALERTS: AlertItem[] = [
+  {
+    id: 'alert-room-c-temperature',
+    roomId: 'room-c',
+    roomName: 'Room C',
+    metric: 'temperature',
+    typeLabel: 'Temperature high',
+    message: 'Room C temperature above range (4.8 °C)',
+    severity: 'critical',
+    timestamp: '06:18',
+    acknowledged: false,
+  },
+  {
+    id: 'alert-room-b-humidity',
+    roomId: 'room-b',
+    roomName: 'Room B',
+    metric: 'humidity',
+    typeLabel: 'Humidity near limit',
+    message: 'Room B humidity outside 90-95%',
+    severity: 'warning',
+    timestamp: '05:52',
+    acknowledged: false,
+  },
+  {
+    id: 'alert-room-d-sensor',
+    roomId: 'room-d',
+    roomName: 'Room D',
+    metric: 'sensor',
+    typeLabel: 'Sensor offline',
+    message: 'Room D sensor offline since 05:14',
+    severity: 'no_data',
+    timestamp: '05:14',
+    acknowledged: false,
+  },
+];
+
 export function createInitialState(): PostharvestState {
   const initialAlerts = syncAlertsWithRooms(
     INITIAL_ROOMS,
     DEFAULT_CROP_RULES,
-    [
-      {
-        id: 'alert-room-c-temperature',
-        roomId: 'room-c',
-        roomName: 'Room C',
-        metric: 'temperature',
-        typeLabel: 'Temperature high',
-        message: 'Room C temperature above range (4.8 °C)',
-        severity: 'critical',
-        timestamp: '06:18',
-        acknowledged: false,
-      },
-      {
-        id: 'alert-room-b-humidity',
-        roomId: 'room-b',
-        roomName: 'Room B',
-        metric: 'humidity',
-        typeLabel: 'Humidity near limit',
-        message: 'Room B humidity outside 90-95%',
-        severity: 'warning',
-        timestamp: '05:52',
-        acknowledged: false,
-      },
-      {
-        id: 'alert-room-d-sensor',
-        roomId: 'room-d',
-        roomName: 'Room D',
-        metric: 'sensor',
-        typeLabel: 'Sensor offline',
-        message: 'Room D sensor offline since 05:14',
-        severity: 'no_data',
-        timestamp: '05:14',
-        acknowledged: false,
-      },
-    ],
+    INITIAL_ALERTS,
     '06:32'
   );
 
@@ -422,8 +425,9 @@ export function createInitialState(): PostharvestState {
     lastUpdated: '06:32',
     auth: {
       isAuthenticated: false,
+      mode: 'demo',
       user: { ...DEFAULT_USER_PROFILE },
-      password: 'manager123',
+      password: '',
     },
     notifications: { ...DEFAULT_NOTIFICATION_SETTINGS },
     glass: { ...DEFAULT_GLASS_SETTINGS },

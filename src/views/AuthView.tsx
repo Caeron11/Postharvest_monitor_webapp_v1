@@ -25,6 +25,8 @@ export function AuthView() {
   const {
     state,
     kpis,
+    isSupabaseReady,
+    signInWithGoogle,
     signIn,
     signUp,
     demoLogin,
@@ -40,13 +42,27 @@ export function AuthView() {
     state.auth.user.cooperativeName
   );
   const [role, setRole] = useState<UserRole>(state.auth.user.role);
-  const [password, setPassword] = useState('manager123');
+  const [password, setPassword] = useState(isSupabaseReady ? '' : 'manager123');
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const previewRooms = sortRoomsBySeverity(state.rooms, state.rules);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleGoogleSignIn = async () => {
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      const result = await signInWithGoogle();
+      if (result.error) {
+        setError(result.error);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const check = validateAuthForm({
       mode,
@@ -60,18 +76,25 @@ export function AuthView() {
       return;
     }
     setError(null);
-    if (mode === 'signin') {
-      signIn(email, password);
-    } else {
-      signUp(
-        {
-          fullName,
-          email,
-          cooperativeName,
-          role,
-        },
-        password
-      );
+    setIsSubmitting(true);
+    try {
+      const result =
+        mode === 'signin'
+          ? await signIn(email, password)
+          : await signUp(
+              {
+                fullName,
+                email,
+                cooperativeName,
+                role,
+              },
+              password
+            );
+      if (result.error) {
+        setError(result.error);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -343,6 +366,7 @@ export function AuthView() {
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
+                    placeholder={isSupabaseReady ? 'Enter password' : undefined}
                     onChange={(e) => {
                       setPassword(e.target.value);
                       setError(null);
@@ -375,17 +399,44 @@ export function AuthView() {
 
               <button
                 type="submit"
-                className="btn-primary min-h-[44px] w-full px-5 rounded-full text-sm font-semibold cursor-pointer mt-1"
+                disabled={isSubmitting}
+                className="btn-primary min-h-[44px] w-full px-5 rounded-full text-sm font-semibold cursor-pointer mt-1 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                {mode === 'signin' ? copy.signInTitle : copy.createAccountTitle}
+                {isSubmitting
+                  ? mode === 'signin'
+                    ? 'Signing in...'
+                    : 'Creating workspace...'
+                  : mode === 'signin'
+                    ? copy.signInTitle
+                    : copy.createAccountTitle}
               </button>
             </form>
 
-            <div className="pt-3 border-t border-slate-900/10 dark:border-white/10 flex flex-col gap-2">
+            <div className="pt-3 border-t border-slate-900/10 dark:border-white/10 flex flex-col gap-2.5">
               <button
                 type="button"
+                disabled={isSubmitting}
+                onClick={handleGoogleSignIn}
+                className="btn-secondary min-h-[44px] w-full px-4 rounded-full text-sm font-semibold inline-flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-60"
+              >
+                <svg
+                  className="w-4 h-4 shrink-0"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill="currentColor"
+                    d="M21.35 11.1h-9.18v2.98h5.27c-.23 1.48-1.71 4.35-5.27 4.35-3.17 0-5.76-2.63-5.76-5.87s2.59-5.87 5.76-5.87c1.81 0 3.02.77 3.71 1.43l2.53-2.44C16.79 4.18 14.68 3.25 12.17 3.25 7.21 3.25 3.2 7.26 3.2 12.22s4.01 8.97 8.97 8.97c5.18 0 8.61-3.64 8.61-8.77 0-.59-.06-1.04-.14-1.32z"
+                  />
+                </svg>
+                <span>Continue with Google</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={isSubmitting}
                 onClick={demoLogin}
-                className="btn-secondary min-h-[44px] w-full px-4 rounded-full text-sm font-semibold inline-flex items-center justify-center gap-2 cursor-pointer"
+                className="btn-secondary min-h-[44px] w-full px-4 rounded-full text-sm font-semibold inline-flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
               >
                 <ShieldCheck className="w-4 h-4" strokeWidth={1.75} />
                 <span>{copy.demoManagerLogin}</span>
@@ -397,7 +448,9 @@ export function AuthView() {
 
       <footer className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center justify-between gap-2 pt-4">
         <span>Cold-Chain Operations Gateway</span>
-        <span className="font-tabular">Local session persistence active</span>
+        <span className="font-tabular">
+          {state.auth.user.cooperativeName} Cooperative
+        </span>
       </footer>
     </div>
   );

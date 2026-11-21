@@ -36,8 +36,13 @@ export interface UserProfile {
   role: UserRole;
 }
 
+export type AuthSessionMode = 'demo' | 'supabase' | 'cloudsql';
+
 export interface AuthState {
   isAuthenticated: boolean;
+  mode?: AuthSessionMode;
+  userId?: string;
+  cooperativeId?: string;
   user: UserProfile;
   password: string;
 }
