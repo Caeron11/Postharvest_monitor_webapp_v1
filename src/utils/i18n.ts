@@ -1,4 +1,4 @@
-import type { LanguageCode } from '../types/postharvest';
+import type { CropType, LanguageCode } from '../types/postharvest';
 
 export interface UiCopy {
   navDashboard: string;
@@ -182,4 +182,19 @@ const FIL_COPY: UiCopy = {
 
 export function getUiCopy(lang: LanguageCode): UiCopy {
   return lang === 'fil' ? FIL_COPY : EN_COPY;
+}
+
+const CROP_LABELS: Record<LanguageCode, Record<CropType, string>> = {
+  en: {
+    Tomato: 'Tomato',
+    Broccoli: 'Broccoli',
+  },
+  fil: {
+    Tomato: 'Kamatis',
+    Broccoli: 'Brokoli',
+  },
+};
+
+export function formatCropLabel(crop: CropType, lang: LanguageCode): string {
+  return CROP_LABELS[lang]?.[crop] ?? crop;
 }

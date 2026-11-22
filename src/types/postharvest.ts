@@ -9,11 +9,7 @@ export type UserRole =
   | 'Cold-Chain Operator'
   | 'Quality Inspector';
 
-export type CropType =
-  | 'Strawberries'
-  | 'Bell Peppers'
-  | 'Highland Lettuce'
-  | 'Carrots';
+export type CropType = 'Tomato' | 'Broccoli';
 
 export type SeverityLevel = 'critical' | 'warning' | 'no_data' | 'in_range';
 
@@ -79,6 +75,7 @@ export interface StorageRoom {
   id: string;
   name: string;
   crop: CropType;
+  variety?: string;
   online: boolean;
   offlineSince?: string;
   tempC: number;

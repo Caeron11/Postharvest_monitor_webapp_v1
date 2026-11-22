@@ -80,8 +80,25 @@ import {
 import { buildRoutePath, parseRoutePath } from '../utils/routeSync';
 import { playNotificationChime } from '../utils/soundCue';
 
-const STORAGE_KEY = 'postharvest_monitor_state_v2';
-const LEGACY_STORAGE_KEY = 'postharvest_monitor_state_v1';
+const STORAGE_KEY = 'postharvest_monitor_state_v3';
+const LEGACY_STORAGE_KEYS = [
+  'postharvest_monitor_state_v2',
+  'postharvest_monitor_state_v1',
+];
+
+const VALID_CROPS = new Set<CropType>(['Tomato', 'Broccoli']);
+
+function hasValidCropDataset(parsed: Partial<PostharvestState>): boolean {
+  if (parsed.schemaVersion !== STATE_SCHEMA_VERSION) return false;
+  if (!Array.isArray(parsed.rooms) || parsed.rooms.length === 0) return false;
+  if (!Array.isArray(parsed.batches)) return false;
+  if (!parsed.rules || !parsed.rules.Tomato || !parsed.rules.Broccoli) {
+    return false;
+  }
+  const roomsValid = parsed.rooms.every((r) => VALID_CROPS.has(r.crop));
+  const batchesValid = parsed.batches.every((b) => VALID_CROPS.has(b.crop));
+  return roomsValid && batchesValid;
+}
 
 const VALID_ROLES: UserRole[] = [
   'Facility Manager',
@@ -183,10 +200,12 @@ function loadPersistedState(): PostharvestState {
   try {
     const raw =
       window.localStorage.getItem(STORAGE_KEY) ??
-      window.localStorage.getItem(LEGACY_STORAGE_KEY);
+      LEGACY_STORAGE_KEYS.map((k) => window.localStorage.getItem(k)).find(
+        Boolean
+      );
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<PostharvestState>;
-      if (parsed && Array.isArray(parsed.rooms) && parsed.rules) {
+      if (parsed) {
         const glassIn = parsed.glass;
         const notifIn = parsed.notifications;
         const authIn = parsed.auth;
@@ -196,15 +215,35 @@ function loadPersistedState(): PostharvestState {
             : authIn?.mode === 'cloudsql'
               ? 'cloudsql'
               : 'demo';
+        const validDataset = hasValidCropDataset(parsed);
+        const safeRuleCrop: CropType =
+          parsed.selectedRuleCrop && VALID_CROPS.has(parsed.selectedRuleCrop)
+            ? parsed.selectedRuleCrop
+            : fallback.selectedRuleCrop;
+
         merged = {
           ...fallback,
-          ...parsed,
+          ...(validDataset ? parsed : {}),
           schemaVersion: STATE_SCHEMA_VERSION,
+          activeView: parsed.activeView ?? fallback.activeView,
+          selectedRoomId: validDataset
+            ? (parsed.selectedRoomId ?? fallback.selectedRoomId)
+            : fallback.selectedRoomId,
+          selectedBatchId: validDataset
+            ? (parsed.selectedBatchId ?? fallback.selectedBatchId)
+            : fallback.selectedBatchId,
+          selectedRuleCrop: safeRuleCrop,
           theme: parsed.theme === 'dark' ? 'dark' : 'light',
           language: parsed.language === 'fil' ? 'fil' : 'en',
           alertsSubTab:
             parsed.alertsSubTab === 'settings' ? 'settings' : 'alerts',
-          rules: { ...DEFAULT_CROP_RULES, ...parsed.rules },
+          rules: validDataset
+            ? {
+                Tomato: parsed.rules?.Tomato ?? DEFAULT_CROP_RULES.Tomato,
+                Broccoli: parsed.rules?.Broccoli ?? DEFAULT_CROP_RULES.Broccoli,
+              }
+            : { ...DEFAULT_CROP_RULES },
+          priceSeriesByCrop: fallback.priceSeriesByCrop,
           simulator: { ...fallback.simulator, ...parsed.simulator },
           glass: {
             blurPx: clampNumber(

@@ -23,12 +23,7 @@ import type {
   UserRole,
 } from './src/types/postharvest.ts';
 
-const VALID_CROPS = new Set<CropType>([
-  'Strawberries',
-  'Bell Peppers',
-  'Highland Lettuce',
-  'Carrots',
-]);
+const VALID_CROPS = new Set<CropType>(['Tomato', 'Broccoli']);
 
 const VALID_MODES = new Set<CompressorMode>(['auto', 'boost', 'standby']);
 

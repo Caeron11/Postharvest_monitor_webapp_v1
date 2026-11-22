@@ -20,7 +20,7 @@ import type {
   ScenarioType,
   UserRole,
 } from '../types/postharvest';
-import { getUiCopy } from '../utils/i18n';
+import { formatCropLabel, getUiCopy } from '../utils/i18n';
 import {
   projectScenarioImpact,
   validateThresholdRule,
@@ -568,7 +568,8 @@ export function AlertsSettingsView() {
                   {copy.thresholdRulesHeading}
                 </h2>
                 <span className="font-tabular text-xs text-slate-500 dark:text-slate-400">
-                  Applies immediately across all rooms storing {selectedCrop}
+                  Applies immediately across all rooms storing{' '}
+                  {formatCropLabel(selectedCrop, state.language)}
                 </span>
               </div>
 
@@ -584,7 +585,7 @@ export function AlertsSettingsView() {
                   >
                     {CROP_LIST.map((crop) => (
                       <option key={crop} value={crop} className="text-slate-900">
-                        {crop}
+                        {formatCropLabel(crop, state.language)}
                       </option>
                     ))}
                   </select>

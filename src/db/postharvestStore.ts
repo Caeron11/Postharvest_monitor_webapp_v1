@@ -32,12 +32,7 @@ import {
   type ProfileThemePrefs,
 } from './schema.ts';
 
-const VALID_CROPS: CropType[] = [
-  'Strawberries',
-  'Bell Peppers',
-  'Highland Lettuce',
-  'Carrots',
-];
+const VALID_CROPS: CropType[] = ['Tomato', 'Broccoli'];
 
 const VALID_ROLES: UserRole[] = [
   'Facility Manager',
@@ -46,7 +41,7 @@ const VALID_ROLES: UserRole[] = [
 ];
 
 function toCropType(value: string): CropType {
-  return (VALID_CROPS.find((c) => c === value) ?? 'Strawberries') as CropType;
+  return (VALID_CROPS.find((c) => c === value) ?? 'Broccoli') as CropType;
 }
 
 function toUserRole(value: string): UserRole {
@@ -88,6 +83,7 @@ function mapRoomRecord(row: typeof storageRooms.$inferSelect): StorageRoom {
     id: row.id,
     name: row.name,
     crop,
+    variety: seedMatch?.variety,
     online: Boolean(row.sensorOnline),
     offlineSince: row.sensorOnline
       ? undefined

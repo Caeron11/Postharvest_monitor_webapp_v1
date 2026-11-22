@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Eye, EyeOff, Moon, ShieldCheck, Sun } from 'lucide-react';
 import { usePostharvest } from '../context/PostharvestContext';
 import type { UserRole } from '../types/postharvest';
-import { getUiCopy } from '../utils/i18n';
+import { formatCropLabel, getUiCopy } from '../utils/i18n';
 import {
   evaluateRoomStatus,
   sortRoomsBySeverity,
@@ -226,7 +226,8 @@ export function AuthView() {
                         {room.name}
                       </span>
                       <span className="text-slate-600 dark:text-slate-400">
-                        {room.crop}
+                        {formatCropLabel(room.crop, state.language)}
+                        {room.variety ? ` (${room.variety})` : ''}
                       </span>
                     </div>
                     <div className="flex items-center gap-3">

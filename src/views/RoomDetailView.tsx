@@ -2,7 +2,7 @@ import React from 'react';
 import { ArrowLeft, Fan, Power, SlidersHorizontal, Snowflake } from 'lucide-react';
 import { usePostharvest } from '../context/PostharvestContext';
 import type { CompressorMode } from '../types/postharvest';
-import { getUiCopy } from '../utils/i18n';
+import { formatCropLabel, getUiCopy } from '../utils/i18n';
 import { evaluateRoomStatus } from '../utils/postharvestEngine';
 import { GlassCard } from '../components/ui/GlassCard';
 import {
@@ -85,7 +85,8 @@ export function RoomDetailView() {
       {/* Room Heading Row */}
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl sm:text-[28px] font-bold text-slate-950 dark:text-white">
-          {room.name} - {room.crop}
+          {room.name} - {formatCropLabel(room.crop, state.language)}
+          {room.variety ? ` (${room.variety})` : ''}
         </h1>
         <div className="flex flex-wrap items-center gap-2.5">
           <SimulatedDataNotice label={copy.simulatedNotice} />
@@ -366,7 +367,7 @@ export function RoomDetailView() {
                         </button>
                       </td>
                       <td className="py-3 px-3 text-slate-800 dark:text-slate-200">
-                        {batch.crop}
+                        {formatCropLabel(batch.crop, state.language)}
                       </td>
                       <td className="py-3 px-3 font-tabular text-slate-600 dark:text-slate-400">
                         {batch.rackId}

@@ -18,23 +18,23 @@ import {
   INITIAL_ROOMS,
 } from '../data/seedData';
 
-test('evaluateRoomStatus classifies critical, warning, no_data, and in_range rooms', () => {
-  const roomC = INITIAL_ROOMS.find((r) => r.id === 'room-c')!;
-  const roomB = INITIAL_ROOMS.find((r) => r.id === 'room-b')!;
+test('evaluateRoomStatus classifies Broccoli and Tomato rooms across critical, no_data, and in_range', () => {
   const roomA = INITIAL_ROOMS.find((r) => r.id === 'room-a')!;
+  const roomB = INITIAL_ROOMS.find((r) => r.id === 'room-b')!;
+  const roomC = INITIAL_ROOMS.find((r) => r.id === 'room-c')!;
   const roomD = INITIAL_ROOMS.find((r) => r.id === 'room-d')!;
 
   assert.equal(
-    evaluateRoomStatus(roomC, DEFAULT_CROP_RULES[roomC.crop]).severity,
+    evaluateRoomStatus(roomA, DEFAULT_CROP_RULES[roomA.crop]).severity,
     'critical'
   );
   assert.equal(
     evaluateRoomStatus(roomB, DEFAULT_CROP_RULES[roomB.crop]).severity,
-    'warning'
+    'in_range'
   );
   assert.equal(
-    evaluateRoomStatus(roomA, DEFAULT_CROP_RULES[roomA.crop]).severity,
-    'in_range'
+    evaluateRoomStatus(roomC, DEFAULT_CROP_RULES[roomC.crop]).severity,
+    'critical'
   );
   assert.equal(
     evaluateRoomStatus(roomD, DEFAULT_CROP_RULES[roomD.crop]).severity,
@@ -42,29 +42,29 @@ test('evaluateRoomStatus classifies critical, warning, no_data, and in_range roo
   );
 });
 
-test('sortRoomsBySeverity places critical before warning before no_data before in_range', () => {
+test('sortRoomsBySeverity places critical rooms before no_data before in_range', () => {
   const sorted = sortRoomsBySeverity(
     [...INITIAL_ROOMS].reverse(),
     DEFAULT_CROP_RULES
   );
   assert.deepEqual(
     sorted.map((r) => r.id),
-    ['room-c', 'room-b', 'room-d', 'room-a']
+    ['room-a', 'room-c', 'room-d', 'room-b']
   );
 });
 
-test('lowering crop tempMax triggers critical breach and generates open alert', () => {
+test('lowering Broccoli tempMax triggers critical breach on Room B and generates open alert', () => {
   const stricterRules = {
     ...DEFAULT_CROP_RULES,
-    'Highland Lettuce': {
-      ...DEFAULT_CROP_RULES['Highland Lettuce'],
+    Broccoli: {
+      ...DEFAULT_CROP_RULES.Broccoli,
       tempMax: 1.0,
     },
   };
-  const roomA = INITIAL_ROOMS.find((r) => r.id === 'room-a')!;
-  const evalA = evaluateRoomStatus(roomA, stricterRules['Highland Lettuce']);
-  assert.equal(evalA.severity, 'critical');
-  assert.equal(evalA.tempState, 'above');
+  const roomB = INITIAL_ROOMS.find((r) => r.id === 'room-b')!;
+  const evalB = evaluateRoomStatus(roomB, stricterRules.Broccoli);
+  assert.equal(evalB.severity, 'critical');
+  assert.equal(evalB.tempState, 'above');
 
   const syncedAlerts = syncAlertsWithRooms(
     INITIAL_ROOMS,
@@ -72,15 +72,38 @@ test('lowering crop tempMax triggers critical breach and generates open alert', 
     [],
     '06:45'
   );
-  const roomAAlert = syncedAlerts.find((a) => a.roomId === 'room-a');
-  assert.ok(roomAAlert);
-  assert.equal(roomAAlert.severity, 'critical');
-  assert.equal(roomAAlert.acknowledged, false);
+  const roomBAlert = syncedAlerts.find((a) => a.roomId === 'room-b');
+  assert.ok(roomBAlert);
+  assert.equal(roomBAlert.severity, 'critical');
+  assert.equal(roomBAlert.acknowledged, false);
+  assert.ok(roomBAlert.message.includes('floret yellowing risk'));
+});
+
+test('Tomato temperature below 10.0 C triggers chilling injury alert', () => {
+  const chilledTomatoRoom = {
+    ...INITIAL_ROOMS.find((r) => r.id === 'room-c')!,
+    tempC: 8.5,
+  };
+  const evaluation = evaluateRoomStatus(
+    chilledTomatoRoom,
+    DEFAULT_CROP_RULES.Tomato
+  );
+  assert.equal(evaluation.severity, 'critical');
+  assert.equal(evaluation.tempState, 'below');
+
+  const alerts = syncAlertsWithRooms(
+    [chilledTomatoRoom],
+    DEFAULT_CROP_RULES,
+    [],
+    '06:50'
+  );
+  assert.equal(alerts.length, 1);
+  assert.ok(alerts[0].message.includes('chilling injury risk'));
 });
 
 test('validateThresholdRule rejects tempMin >= tempMax and humidityMin >= humidityMax', () => {
   const invalidTemp = validateThresholdRule({
-    ...DEFAULT_CROP_RULES.Strawberries,
+    ...DEFAULT_CROP_RULES.Broccoli,
     tempMin: 5,
     tempMax: 2,
   });
@@ -90,7 +113,7 @@ test('validateThresholdRule rejects tempMin >= tempMax and humidityMin >= humidi
   );
 
   const invalidHum = validateThresholdRule({
-    ...DEFAULT_CROP_RULES.Strawberries,
+    ...DEFAULT_CROP_RULES.Tomato,
     humidityMin: 96,
     humidityMax: 90,
   });
@@ -99,36 +122,44 @@ test('validateThresholdRule rejects tempMin >= tempMax and humidityMin >= humidi
     'Error: Humidity min must be lower than humidity max.'
   );
 
-  const valid = validateThresholdRule(DEFAULT_CROP_RULES.Strawberries);
-  assert.equal(Object.keys(valid).length, 0);
+  const validBroccoli = validateThresholdRule(DEFAULT_CROP_RULES.Broccoli);
+  const validTomato = validateThresholdRule(DEFAULT_CROP_RULES.Tomato);
+  assert.equal(Object.keys(validBroccoli).length, 0);
+  assert.equal(Object.keys(validTomato).length, 0);
 });
 
 test('computeBatchRecommendation returns RELEASE NOW, RELEASE SOON, HOLD, and RELEASED', () => {
-  const roomC = INITIAL_ROOMS.find((r) => r.id === 'room-c')!;
-  const roomB = INITIAL_ROOMS.find((r) => r.id === 'room-b')!;
   const roomA = INITIAL_ROOMS.find((r) => r.id === 'room-a')!;
+  const roomB = INITIAL_ROOMS.find((r) => r.id === 'room-b')!;
+  const roomC = INITIAL_ROOMS.find((r) => r.id === 'room-c')!;
 
   const b1 = computeBatchRecommendation(
     INITIAL_BATCHES[0],
-    evaluateRoomStatus(roomC, DEFAULT_CROP_RULES[roomC.crop])
+    evaluateRoomStatus(roomA, DEFAULT_CROP_RULES[roomA.crop])
   );
   assert.equal(b1.status, 'release_now');
 
   const b2 = computeBatchRecommendation(
     INITIAL_BATCHES[1],
-    evaluateRoomStatus(roomB, DEFAULT_CROP_RULES[roomB.crop])
+    evaluateRoomStatus(roomA, DEFAULT_CROP_RULES[roomA.crop])
   );
   assert.equal(b2.status, 'release_soon');
 
   const b3 = computeBatchRecommendation(
     INITIAL_BATCHES[2],
-    evaluateRoomStatus(roomA, DEFAULT_CROP_RULES[roomA.crop])
+    evaluateRoomStatus(roomC, DEFAULT_CROP_RULES[roomC.crop])
   );
-  assert.equal(b3.status, 'hold');
+  assert.equal(b3.status, 'release_now');
+
+  const b5 = computeBatchRecommendation(
+    INITIAL_BATCHES[4],
+    evaluateRoomStatus(roomB, DEFAULT_CROP_RULES[roomB.crop])
+  );
+  assert.equal(b5.status, 'hold');
 
   const released = computeBatchRecommendation(
     { ...INITIAL_BATCHES[0], released: true, releasedAt: '06:40' },
-    evaluateRoomStatus(roomC, DEFAULT_CROP_RULES[roomC.crop])
+    evaluateRoomStatus(roomA, DEFAULT_CROP_RULES[roomA.crop])
   );
   assert.equal(released.status, 'released');
 });
@@ -182,10 +213,11 @@ test('computeFacilityKpis stays synchronized across alert ack, room reconnect, a
   assert.equal(initialKpis.roomsInRangeCount, 1);
   assert.equal(initialKpis.offlineRoomsCount, 1);
   assert.equal(initialKpis.openAlertsCount, 3);
-  assert.equal(initialKpis.criticalAlertsCount, 1);
+  assert.equal(initialKpis.criticalAlertsCount, 2);
+  assert.equal(initialKpis.noDataAlertsCount, 1);
   assert.equal(initialKpis.activeBatchesCount, base.batches.length);
 
-  // Acknowledge critical alert -> openAlertsCount drops 3 -> 2, criticalAlertsCount 1 -> 0
+  // Acknowledge all critical alerts -> openAlertsCount drops 3 -> 1, criticalAlertsCount 2 -> 0
   const ackedAlerts = base.alerts.map((a) =>
     a.severity === 'critical' ? { ...a, acknowledged: true } : a
   );
@@ -195,7 +227,7 @@ test('computeFacilityKpis stays synchronized across alert ack, room reconnect, a
     base.batches,
     ackedAlerts
   );
-  assert.equal(afterAck.openAlertsCount, 2);
+  assert.equal(afterAck.openAlertsCount, 1);
   assert.equal(afterAck.criticalAlertsCount, 0);
 
   // Reconnect Room D -> roomsInRangeCount rises 1 -> 2, offlineRoomsCount drops 1 -> 0
@@ -280,4 +312,3 @@ test('validateAuthForm validates signin and signup fields with inline errors', (
   });
   assert.equal(validSignup.valid, true);
 });
-

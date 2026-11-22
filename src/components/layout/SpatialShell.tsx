@@ -158,12 +158,12 @@ export function SpatialShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Mobile Compact Header */}
-      <header className="lg:hidden sticky top-0 z-30 px-3 pt-2.5">
+      <header className="lg:hidden sticky top-0 z-30 mb-6 px-3 pt-2.5 pb-1 bg-gradient-to-b from-[#EEF1F6]/95 via-[#EEF1F6]/75 to-transparent dark:from-[#0D0F12]/95 dark:via-[#0D0F12]/75 dark:to-transparent">
         <GlassCard
           tier="floating"
           radius="pill"
           refraction
-          className="h-[50px] px-4 flex items-center justify-between gap-2"
+          className="glass-overlay-dense h-[52px] px-4 flex items-center justify-between gap-2"
         >
           <button
             type="button"
@@ -198,7 +198,7 @@ export function SpatialShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {/* Main Content Stage */}
-      <main className="flex-1 min-w-0 px-4 sm:px-5 lg:px-6 xl:px-8 pt-4 lg:pt-6 pb-24 lg:pb-10 max-w-[1280px] w-full mx-auto">
+      <main className="relative z-0 flex-1 min-w-0 px-4 sm:px-5 lg:px-6 xl:px-8 pt-0 lg:pt-6 pb-24 lg:pb-10 max-w-[1280px] w-full mx-auto">
         {children}
       </main>
 
@@ -211,7 +211,7 @@ export function SpatialShell({ children }: { children: React.ReactNode }) {
           tier="floating"
           radius="pill"
           refraction
-          className="h-[58px] px-1.5 flex items-center justify-around gap-1"
+          className="glass-overlay-dense h-[58px] px-1.5 flex items-center justify-around gap-1"
         >
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -246,13 +246,13 @@ export function SpatialShell({ children }: { children: React.ReactNode }) {
         <div
           role="status"
           aria-live="polite"
-          className="fixed bottom-20 lg:bottom-5 left-1/2 -translate-x-1/2 z-40 pointer-events-none"
+          className="fixed bottom-20 lg:bottom-5 left-1/2 -translate-x-1/2 z-[60] pointer-events-none"
         >
           <GlassCard
             tier="floating"
             radius="pill"
             refraction
-            className="px-4 py-2 text-xs font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap"
+            className="glass-overlay-dense px-4 py-2 text-xs font-semibold text-slate-900 dark:text-slate-100 whitespace-nowrap"
           >
             {toastMessage}
           </GlassCard>

@@ -41,17 +41,17 @@ create table if not exists public.storage_rooms (
   cooperative_id text not null,
   cooperative_name text not null,
   name text not null,
-  crop text not null,
+  crop text not null check (crop in ('Tomato', 'Broccoli')),
   temp_c numeric not null,
   humidity_pct numeric not null,
   co2_ppm numeric not null,
   gas_index numeric not null,
   min_temp numeric not null,
   max_temp numeric not null,
-  min_humidity numeric not null default 85,
-  max_humidity numeric not null default 95,
-  co2_max numeric not null default 1000,
-  gas_index_max numeric not null default 3.0,
+  min_humidity numeric not null default 90,
+  max_humidity numeric not null default 98,
+  co2_max numeric not null default 1500,
+  gas_index_max numeric not null default 1.8,
   equipment_mode text not null default 'auto' check (
     equipment_mode in ('auto', 'boost', 'standby')
   ),
@@ -69,7 +69,7 @@ create table if not exists public.batches (
   cooperative_id text not null,
   room_id text not null references public.storage_rooms(id) on delete cascade,
   rack_id text not null default 'R1',
-  crop text not null,
+  crop text not null check (crop in ('Tomato', 'Broccoli')),
   quantity_kg numeric not null check (quantity_kg >= 0),
   shelf_life_days integer not null check (shelf_life_days >= 0),
   shelf_life_limit integer not null check (shelf_life_limit >= 1),
@@ -226,3 +226,94 @@ begin
     alter publication supabase_realtime add table public.alerts;
   end if;
 end $$;
+
+-- Idempotent baseline seed data for Benguet Highland Cooperative (Tomato & Broccoli)
+insert into public.storage_rooms (
+  id,
+  cooperative_id,
+  cooperative_name,
+  name,
+  crop,
+  temp_c,
+  humidity_pct,
+  co2_ppm,
+  gas_index,
+  min_temp,
+  max_temp,
+  min_humidity,
+  max_humidity,
+  co2_max,
+  gas_index_max,
+  equipment_mode,
+  defrost_active,
+  sensor_online
+)
+values
+  ('benguet-highland-room-a', 'benguet-highland', 'Benguet Highland', 'Room A', 'Broccoli', 4.6, 96.0, 710, 1.1, 0.0, 2.0, 95, 98, 1000, 1.2, 'boost', false, true),
+  ('benguet-highland-room-b', 'benguet-highland', 'Benguet Highland', 'Room B', 'Broccoli', 1.4, 96.0, 490, 0.6, 0.0, 2.0, 95, 98, 1000, 1.2, 'auto', false, true),
+  ('benguet-highland-room-c', 'benguet-highland', 'Benguet Highland', 'Room C', 'Tomato', 15.4, 91.2, 980, 1.6, 10.0, 12.5, 90, 95, 1500, 1.8, 'boost', false, true),
+  ('benguet-highland-room-d', 'benguet-highland', 'Benguet Highland', 'Room D', 'Tomato', 11.2, 92.5, 640, 0.9, 10.0, 12.5, 90, 95, 1500, 1.8, 'standby', false, false)
+on conflict (id) do update set
+  crop = excluded.crop,
+  temp_c = excluded.temp_c,
+  humidity_pct = excluded.humidity_pct,
+  co2_ppm = excluded.co2_ppm,
+  gas_index = excluded.gas_index,
+  min_temp = excluded.min_temp,
+  max_temp = excluded.max_temp,
+  min_humidity = excluded.min_humidity,
+  max_humidity = excluded.max_humidity,
+  co2_max = excluded.co2_max,
+  gas_index_max = excluded.gas_index_max,
+  equipment_mode = excluded.equipment_mode,
+  sensor_online = excluded.sensor_online;
+
+insert into public.batches (
+  id,
+  cooperative_id,
+  room_id,
+  rack_id,
+  crop,
+  quantity_kg,
+  shelf_life_days,
+  shelf_life_limit,
+  current_price_php,
+  target_price_php,
+  status
+)
+values
+  ('benguet-highland-B-001', 'benguet-highland', 'benguet-highland-room-a', 'R1', 'Broccoli', 420, 2, 10, 158, 145, 'active'),
+  ('benguet-highland-B-002', 'benguet-highland', 'benguet-highland-room-a', 'R2', 'Broccoli', 360, 4, 10, 152, 145, 'active'),
+  ('benguet-highland-B-003', 'benguet-highland', 'benguet-highland-room-c', 'R1', 'Tomato', 680, 3, 14, 88, 82, 'active'),
+  ('benguet-highland-B-004', 'benguet-highland', 'benguet-highland-room-c', 'R2', 'Tomato', 590, 6, 14, 84, 82, 'active'),
+  ('benguet-highland-B-005', 'benguet-highland', 'benguet-highland-room-b', 'R1', 'Broccoli', 510, 8, 10, 134, 148, 'active'),
+  ('benguet-highland-B-006', 'benguet-highland', 'benguet-highland-room-d', 'R1', 'Tomato', 920, 11, 14, 72, 85, 'active'),
+  ('benguet-highland-B-007', 'benguet-highland', 'benguet-highland-room-b', 'R2', 'Broccoli', 440, 9, 10, 128, 148, 'active')
+on conflict (id) do update set
+  room_id = excluded.room_id,
+  rack_id = excluded.rack_id,
+  crop = excluded.crop,
+  quantity_kg = excluded.quantity_kg,
+  shelf_life_days = excluded.shelf_life_days,
+  shelf_life_limit = excluded.shelf_life_limit,
+  current_price_php = excluded.current_price_php,
+  target_price_php = excluded.target_price_php;
+
+insert into public.alerts (
+  id,
+  cooperative_id,
+  room_id,
+  type,
+  severity,
+  message,
+  acknowledged
+)
+values
+  ('10000000-0000-4000-8000-000000000001', 'benguet-highland', 'benguet-highland-room-a', 'Temperature high', 'critical', 'Room A temperature above range (4.6 °C, floret yellowing risk)', false),
+  ('10000000-0000-4000-8000-000000000002', 'benguet-highland', 'benguet-highland-room-c', 'Temperature high', 'critical', 'Room C temperature above range (15.4 °C, accelerated ripening risk)', false),
+  ('10000000-0000-4000-8000-000000000003', 'benguet-highland', 'benguet-highland-room-d', 'Sensor offline', 'no_data', 'Room D sensor offline since 05:14', false)
+on conflict (id) do update set
+  room_id = excluded.room_id,
+  type = excluded.type,
+  severity = excluded.severity,
+  message = excluded.message;

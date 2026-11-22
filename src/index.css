@@ -14,6 +14,14 @@
   --glass-depth: 1;
   --glass-dispersion: 1;
 
+  --z-base: 0;
+  --z-content: 10;
+  --z-filter-bar: 20;
+  --z-header: 30;
+  --z-popover: 40;
+  --z-modal: 50;
+  --z-toast: 60;
+
   --bg-canvas: #eef1f6;
   --text-primary: #0f172a;
   --text-secondary: #475569;
@@ -199,6 +207,17 @@
       rgba(38, 43, 52, min(0.96, calc(var(--glass-frost) * 1.26))),
       rgba(22, 25, 31, min(0.88, calc(var(--glass-frost) * 1.06)))
     );
+  }
+
+  /* High-density floating glass for sticky headers, popovers, and modal overlays */
+  .glass-overlay-dense {
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(28px) saturate(185%);
+    -webkit-backdrop-filter: blur(28px) saturate(185%);
+  }
+
+  .dark .glass-overlay-dense {
+    background: rgba(24, 28, 36, 0.94);
   }
 
   /* Chromatic edge dispersion rim: glossy white -> warm tangerine -> silver-slate */

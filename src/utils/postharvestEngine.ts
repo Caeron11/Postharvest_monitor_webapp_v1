@@ -288,7 +288,15 @@ export function syncAlertsWithRooms(
       typeLabel =
         evaluation.tempState === 'above' ? 'Temperature high' : 'Temperature low';
       const direction = evaluation.tempState === 'above' ? 'above' : 'below';
-      message = `${room.name} temperature ${direction} range (${room.tempC.toFixed(1)} °C)`;
+      const riskNote =
+        room.crop === 'Broccoli'
+          ? evaluation.tempState === 'above'
+            ? ', floret yellowing risk'
+            : ', freezing injury risk'
+          : evaluation.tempState === 'above'
+            ? ', accelerated ripening risk'
+            : ', chilling injury risk';
+      message = `${room.name} temperature ${direction} range (${room.tempC.toFixed(1)} °C${riskNote})`;
     } else if (evaluation.primaryMetric === 'humidity') {
       typeLabel =
         evaluation.humidityState === 'below'
@@ -429,7 +437,7 @@ export function applyScenarioToRooms(
     }
 
     if (scenario === 'equipment_failure') {
-      const isPrimaryFault = room.id === 'room-c' || room.id === 'room-b';
+      const isPrimaryFault = room.id === 'room-a' || room.id === 'room-c';
       const deltaC =
         (isPrimaryFault ? 3.2 : 1.4) * durationScale +
         ambientOffsetC * 0.4 +

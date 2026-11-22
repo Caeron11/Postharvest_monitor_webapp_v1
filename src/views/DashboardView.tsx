@@ -1,7 +1,7 @@
 import React from 'react';
 import { ArrowRight, RefreshCw } from 'lucide-react';
 import { usePostharvest } from '../context/PostharvestContext';
-import { getUiCopy } from '../utils/i18n';
+import { formatCropLabel, getUiCopy } from '../utils/i18n';
 import {
   computeBatchRecommendation,
   evaluateRoomStatus,
@@ -55,8 +55,8 @@ export function DashboardView() {
     })
     .sort((a, b) => a.recommendation.urgencyScore - b.recommendation.urgencyScore);
 
-  const focalCrop = batchWithRecs[0]?.batch.crop ?? 'Strawberries';
-  const focalTargetPrice = batchWithRecs[0]?.batch.targetPricePhp ?? 260;
+  const focalCrop = batchWithRecs[0]?.batch.crop ?? 'Broccoli';
+  const focalTargetPrice = batchWithRecs[0]?.batch.targetPricePhp ?? 145;
 
   if (isHydrating) {
     return (
@@ -265,53 +265,54 @@ export function DashboardView() {
                   className="glass-recessed rounded-[20px] p-4 flex flex-col justify-between gap-3.5"
                 >
                   <div className="flex flex-col gap-2">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h3 className="text-base font-bold text-slate-950 dark:text-white">
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <h3 className="text-base font-bold text-slate-950 dark:text-white whitespace-nowrap">
                           {room.name}
                         </h3>
-                        <p className="text-xs text-slate-600 dark:text-slate-400">
-                          {room.crop}
-                        </p>
+                        <StatusBadge
+                          tone={severityToTone(evaluation.severity)}
+                          label={evaluation.statusLabel}
+                          compact
+                        />
                       </div>
-                      <StatusBadge
-                        tone={severityToTone(evaluation.severity)}
-                        label={evaluation.statusLabel}
-                        compact
-                      />
+                      <p className="text-xs text-slate-600 dark:text-slate-400 truncate">
+                        {formatCropLabel(room.crop, state.language)}
+                        {room.variety ? ` (${room.variety})` : ''}
+                      </p>
                     </div>
 
                     {room.online ? (
-                      <dl className="grid grid-cols-2 gap-x-4 gap-y-1.5 pt-1 text-xs">
-                        <div className="flex items-center justify-between gap-2">
-                          <dt className="text-slate-600 dark:text-slate-400">
-                            Temperature
+                      <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 pt-1 text-xs">
+                        <div className="flex items-center justify-between gap-1.5">
+                          <dt className="text-slate-600 dark:text-slate-400 whitespace-nowrap">
+                            Temp
                           </dt>
-                          <dd className="font-tabular font-semibold text-slate-950 dark:text-white">
+                          <dd className="font-tabular font-semibold text-slate-950 dark:text-white whitespace-nowrap">
                             {room.tempC.toFixed(1)} °C
                           </dd>
                         </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <dt className="text-slate-600 dark:text-slate-400">
+                        <div className="flex items-center justify-between gap-1.5">
+                          <dt className="text-slate-600 dark:text-slate-400 whitespace-nowrap">
                             Humidity
                           </dt>
-                          <dd className="font-tabular font-semibold text-slate-950 dark:text-white">
+                          <dd className="font-tabular font-semibold text-slate-950 dark:text-white whitespace-nowrap">
                             {room.humidityPct.toFixed(1)} %
                           </dd>
                         </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <dt className="text-slate-600 dark:text-slate-400">
+                        <div className="flex items-center justify-between gap-1.5">
+                          <dt className="text-slate-600 dark:text-slate-400 whitespace-nowrap">
                             CO2
                           </dt>
-                          <dd className="font-tabular font-semibold text-slate-950 dark:text-white">
+                          <dd className="font-tabular font-semibold text-slate-950 dark:text-white whitespace-nowrap">
                             {room.co2Ppm} ppm
                           </dd>
                         </div>
-                        <div className="flex items-center justify-between gap-2">
-                          <dt className="text-slate-600 dark:text-slate-400">
+                        <div className="flex items-center justify-between gap-1.5">
+                          <dt className="text-slate-600 dark:text-slate-400 whitespace-nowrap">
                             Gas index
                           </dt>
-                          <dd className="font-tabular font-semibold text-slate-950 dark:text-white">
+                          <dd className="font-tabular font-semibold text-slate-950 dark:text-white whitespace-nowrap">
                             {room.gasIndex.toFixed(1)}
                           </dd>
                         </div>
@@ -435,7 +436,7 @@ export function DashboardView() {
                   <div className="min-w-0">
                     <div className="text-sm font-semibold text-slate-950 dark:text-white">
                       <span className="font-tabular">{batch.id}</span> ·{' '}
-                      {batch.crop}
+                      {formatCropLabel(batch.crop, state.language)}
                     </div>
                     <div className="font-tabular text-xs text-slate-600 dark:text-slate-400">
                       Shelf life left: {batch.shelfLifeDays} days ·{' '}
@@ -472,7 +473,7 @@ export function DashboardView() {
             {copy.farmgatePriceHeading}
           </h2>
           <PriceWindowChart
-            crop={focalCrop}
+            crop={formatCropLabel(focalCrop, state.language)}
             points={state.priceSeriesByCrop[focalCrop]}
             targetPricePhp={focalTargetPrice}
           />

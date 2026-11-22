@@ -30,15 +30,10 @@ import type {
 } from '../types/postharvest';
 import { formatTimeHHMM } from '../utils/postharvestEngine';
 
-const VALID_CROPS: CropType[] = [
-  'Strawberries',
-  'Bell Peppers',
-  'Highland Lettuce',
-  'Carrots',
-];
+const VALID_CROPS: CropType[] = ['Tomato', 'Broccoli'];
 
 function toCropType(value: string): CropType {
-  return (VALID_CROPS.find((c) => c === value) ?? 'Strawberries') as CropType;
+  return (VALID_CROPS.find((c) => c === value) ?? 'Broccoli') as CropType;
 }
 
 function toMetric(
@@ -64,6 +59,7 @@ export function mapStorageRoomRow(
     id: row.id,
     name: row.name,
     crop,
+    variety: existing?.variety ?? seedMatch?.variety,
     online: Boolean(row.sensor_online),
     offlineSince: row.sensor_online
       ? undefined

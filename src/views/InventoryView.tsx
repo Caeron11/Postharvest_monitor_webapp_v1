@@ -3,7 +3,7 @@ import { ArrowUpDown, CalendarClock, Plus, RotateCcw } from 'lucide-react';
 import { usePostharvest } from '../context/PostharvestContext';
 import { CROP_LIST } from '../data/seedData';
 import type { CropType, RecommendationStatus } from '../types/postharvest';
-import { getUiCopy } from '../utils/i18n';
+import { formatCropLabel, getUiCopy } from '../utils/i18n';
 import {
   computeBatchRecommendation,
   evaluateRoomStatus,
@@ -47,13 +47,13 @@ export function InventoryView() {
 
   // Add batch modal state
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [newCrop, setNewCrop] = useState<CropType>('Strawberries');
-  const [newRoomId, setNewRoomId] = useState<string>('room-c');
+  const [newCrop, setNewCrop] = useState<CropType>('Broccoli');
+  const [newRoomId, setNewRoomId] = useState<string>('room-a');
   const [newRackId, setNewRackId] = useState<string>('R1');
   const [newQty, setNewQty] = useState<string>('320');
-  const [newShelfLife, setNewShelfLife] = useState<string>('5');
-  const [newCurrentPrice, setNewCurrentPrice] = useState<string>('275');
-  const [newTargetPrice, setNewTargetPrice] = useState<string>('260');
+  const [newShelfLife, setNewShelfLife] = useState<string>('10');
+  const [newCurrentPrice, setNewCurrentPrice] = useState<string>('152');
+  const [newTargetPrice, setNewTargetPrice] = useState<string>('145');
   const [addError, setAddError] = useState<string | null>(null);
 
   const enrichedBatches = useMemo(() => {
@@ -193,6 +193,7 @@ export function InventoryView() {
     }
 
     const todayIso = new Date().toISOString().slice(0, 10);
+    const baselineLimit = newCrop === 'Tomato' ? 14 : 10;
     addBatch({
       crop: newCrop,
       roomId: newRoomId,
@@ -200,7 +201,7 @@ export function InventoryView() {
       qtyKg: Math.round(qtyKg),
       harvestedDate: todayIso,
       shelfLifeDays: Math.round(shelfLifeDays),
-      shelfLifeLimitDays: Math.max(Math.round(shelfLifeDays) + 3, 7),
+      shelfLifeLimitDays: Math.max(Math.round(shelfLifeDays), baselineLimit),
       currentPricePhp: Math.round(currentPricePhp),
       targetPricePhp: Math.round(targetPricePhp),
     });
@@ -242,11 +243,12 @@ export function InventoryView() {
       <GlassCard
         tier="surface"
         radius="outer"
-        className="relative z-30 px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+        className="relative z-20 px-4 py-3 flex flex-wrap items-center justify-between gap-3"
       >
         <div className="flex flex-wrap items-center gap-2.5">
           <FilterPopover
             label={copy.filterLabel}
+            language={state.language}
             cropFilter={cropFilter}
             roomFilter={roomFilter}
             statusFilter={statusFilter}
@@ -387,7 +389,7 @@ export function InventoryView() {
                           </button>
                         </td>
                         <td className="py-2.5 px-1.5 text-slate-800 dark:text-slate-200 whitespace-nowrap">
-                          {batch.crop}
+                          {formatCropLabel(batch.crop, state.language)}
                         </td>
                         <td className="py-2.5 px-1.5 text-slate-700 dark:text-slate-300 whitespace-nowrap">
                           {roomName}
@@ -504,7 +506,7 @@ export function InventoryView() {
               </dl>
 
               <PriceWindowChart
-                crop={selectedEntry.batch.crop}
+                crop={formatCropLabel(selectedEntry.batch.crop, state.language)}
                 points={state.priceSeriesByCrop[selectedEntry.batch.crop]}
                 targetPricePhp={selectedEntry.batch.targetPricePhp}
                 compact
@@ -559,26 +561,50 @@ export function InventoryView() {
         </GlassCard>
       </section>
 
-      {/* Release Confirmation Modal (.glass-floating) */}
+      {/* Release Confirmation Modal (Portal .glass-floating) */}
       <Modal
         open={releaseModalOpen}
         title={`Confirm release: ${modalEntry?.batch.id ?? ''}`}
         onClose={() => setReleaseModalOpen(false)}
+        footer={
+          modalEntry ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setReleaseModalOpen(false)}
+                className="btn-secondary min-h-[44px] px-4 rounded-full text-sm font-semibold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                form="confirm-release-form"
+                className="btn-primary min-h-[44px] px-5 rounded-full text-sm font-semibold cursor-pointer"
+              >
+                Confirm release
+              </button>
+            </>
+          ) : undefined
+        }
       >
         {modalEntry && (
-          <form onSubmit={handleConfirmRelease} className="flex flex-col gap-4">
-            <div className="glass-recessed rounded-[18px] p-4 grid grid-cols-2 gap-2 text-xs">
+          <form
+            id="confirm-release-form"
+            onSubmit={handleConfirmRelease}
+            className="space-y-4"
+          >
+            <div className="glass-recessed rounded-[18px] p-4 grid grid-cols-2 gap-3 text-xs">
               <div>
                 <span className="text-slate-500 dark:text-slate-400">Crop</span>
-                <div className="font-semibold text-sm text-slate-900 dark:text-white">
-                  {modalEntry.batch.crop}
+                <div className="font-semibold text-sm text-slate-900 dark:text-white mt-0.5">
+                  {formatCropLabel(modalEntry.batch.crop, state.language)}
                 </div>
               </div>
               <div>
                 <span className="text-slate-500 dark:text-slate-400">
                   Location
                 </span>
-                <div className="font-semibold text-sm text-slate-900 dark:text-white">
+                <div className="font-semibold text-sm text-slate-900 dark:text-white mt-0.5">
                   {modalEntry.roomName} · {modalEntry.batch.rackId}
                 </div>
               </div>
@@ -586,7 +612,7 @@ export function InventoryView() {
                 <span className="text-slate-500 dark:text-slate-400">
                   Available qty
                 </span>
-                <div className="font-tabular font-semibold text-sm text-slate-900 dark:text-white">
+                <div className="font-tabular font-semibold text-sm text-slate-900 dark:text-white mt-0.5">
                   {modalEntry.batch.qtyKg} kg
                 </div>
               </div>
@@ -594,7 +620,7 @@ export function InventoryView() {
                 <span className="text-slate-500 dark:text-slate-400">
                   Current price
                 </span>
-                <div className="font-tabular font-semibold text-sm text-slate-900 dark:text-white">
+                <div className="font-tabular font-semibold text-sm text-slate-900 dark:text-white mt-0.5">
                   {modalEntry.batch.currentPricePhp} PHP/kg
                 </div>
               </div>
@@ -634,34 +660,40 @@ export function InventoryView() {
                 {releaseError}
               </p>
             )}
-
-            <div className="flex items-center justify-end gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setReleaseModalOpen(false)}
-                className="btn-secondary min-h-[44px] px-4 rounded-full text-sm font-semibold cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="btn-primary min-h-[44px] px-5 rounded-full text-sm font-semibold cursor-pointer"
-              >
-                Confirm release
-              </button>
-            </div>
           </form>
         )}
       </Modal>
 
-      {/* Add Batch Modal (.glass-floating) */}
+      {/* Add Batch Modal (Portal .glass-floating) */}
       <Modal
         open={addModalOpen}
         title="Add inventory batch"
         onClose={() => setAddModalOpen(false)}
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setAddModalOpen(false)}
+              className="btn-secondary min-h-[44px] px-4 rounded-full text-sm font-semibold cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              form="add-batch-form"
+              className="btn-primary min-h-[44px] px-5 rounded-full text-sm font-semibold cursor-pointer"
+            >
+              Save batch
+            </button>
+          </>
+        }
       >
-        <form onSubmit={handleAddBatchSubmit} className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <form
+          id="add-batch-form"
+          onSubmit={handleAddBatchSubmit}
+          className="space-y-4"
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <label className="flex flex-col gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
               <span>Crop</span>
               <select
@@ -671,12 +703,21 @@ export function InventoryView() {
                   setNewCrop(crop);
                   const matchingRoom = state.rooms.find((r) => r.crop === crop);
                   if (matchingRoom) setNewRoomId(matchingRoom.id);
+                  if (crop === 'Tomato') {
+                    setNewShelfLife('14');
+                    setNewCurrentPrice('86');
+                    setNewTargetPrice('82');
+                  } else {
+                    setNewShelfLife('10');
+                    setNewCurrentPrice('152');
+                    setNewTargetPrice('145');
+                  }
                 }}
                 className="glass-recessed min-h-[44px] px-3 rounded-[14px] text-sm text-slate-950 dark:text-white bg-transparent"
               >
                 {CROP_LIST.map((crop) => (
                   <option key={crop} value={crop} className="text-slate-900">
-                    {crop}
+                    {formatCropLabel(crop, state.language)}
                   </option>
                 ))}
               </select>
@@ -691,7 +732,7 @@ export function InventoryView() {
               >
                 {state.rooms.map((room) => (
                   <option key={room.id} value={room.id} className="text-slate-900">
-                    {room.name} ({room.crop})
+                    {room.name} ({formatCropLabel(room.crop, state.language)})
                   </option>
                 ))}
               </select>
@@ -765,22 +806,6 @@ export function InventoryView() {
               {addError}
             </p>
           )}
-
-          <div className="flex items-center justify-end gap-2.5 pt-2">
-            <button
-              type="button"
-              onClick={() => setAddModalOpen(false)}
-              className="btn-secondary min-h-[44px] px-4 rounded-full text-sm font-semibold cursor-pointer"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn-primary min-h-[44px] px-5 rounded-full text-sm font-semibold cursor-pointer"
-            >
-              Save batch
-            </button>
-          </div>
         </form>
       </Modal>
     </div>
