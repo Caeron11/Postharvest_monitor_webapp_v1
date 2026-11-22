@@ -13,11 +13,16 @@ import {
   Volume2,
 } from 'lucide-react';
 import { usePostharvest } from '../context/PostharvestContext';
-import { CROP_LIST } from '../data/seedData';
+import {
+  CROP_LIST,
+  CROP_PROFILES,
+  TOMATO_MATURITY_PRESETS,
+} from '../data/seedData';
 import type {
   CropThresholdRule,
   CropType,
   ScenarioType,
+  TomatoMaturityPreset,
   UserRole,
 } from '../types/postharvest';
 import { formatCropLabel, getUiCopy } from '../utils/i18n';
@@ -134,6 +139,22 @@ export function AlertsSettingsView() {
     setSelectedCrop(crop);
     setDraftRule(state.rules[crop]);
   };
+
+  const handleTomatoPresetChange = (preset: TomatoMaturityPreset) => {
+    setDraftRule((prev) => ({
+      ...prev,
+      ...TOMATO_MATURITY_PRESETS[preset],
+      notifyInApp: prev.notifyInApp,
+      notifySms: prev.notifySms,
+    }));
+  };
+
+  const activeCropProfile = useMemo(() => {
+    if (selectedCrop === 'Broccoli') return CROP_PROFILES.broccoli;
+    return draftRule.maturityPreset === 'firm_ripe'
+      ? CROP_PROFILES.tomato_firm_ripe
+      : CROP_PROFILES.tomato_mature_green;
+  }, [selectedCrop, draftRule.maturityPreset]);
 
   const validationErrors = useMemo(
     () => validateThresholdRule(draftRule),
@@ -511,30 +532,51 @@ export function AlertsSettingsView() {
                   </label>
                 </div>
 
-                <div className="glass-recessed rounded-[18px] px-3.5 py-3 grid grid-cols-3 gap-2 text-center">
-                  <div>
-                    <div className="text-[11px] text-slate-600 dark:text-slate-400">
-                      Spoilage risk
+                <div className="glass-recessed rounded-[18px] px-3.5 py-3 flex flex-col gap-2.5">
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div>
+                      <div className="text-[11px] text-slate-600 dark:text-slate-400">
+                        Projected risk
+                      </div>
+                      <div className="font-tabular text-sm font-bold text-slate-950 dark:text-white">
+                        {projection.spoilageRiskPct}%
+                      </div>
                     </div>
-                    <div className="font-tabular text-sm font-bold text-slate-950 dark:text-white">
-                      {projection.spoilageRiskPct}%
+                    <div>
+                      <div className="text-[11px] text-slate-600 dark:text-slate-400">
+                        Shelf delta
+                      </div>
+                      <div className="font-tabular text-sm font-bold text-slate-950 dark:text-white">
+                        {projection.shelfLifeDeltaDays} d
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-[11px] text-slate-600 dark:text-slate-400">
+                        Breach rooms
+                      </div>
+                      <div className="font-tabular text-sm font-bold text-slate-950 dark:text-white">
+                        {projection.projectedBreachRooms}
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <div className="text-[11px] text-slate-600 dark:text-slate-400">
-                      Shelf delta
-                    </div>
-                    <div className="font-tabular text-sm font-bold text-slate-950 dark:text-white">
-                      {projection.shelfLifeDeltaDays} d
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] text-slate-600 dark:text-slate-400">
-                      Breach rooms
-                    </div>
-                    <div className="font-tabular text-sm font-bold text-slate-950 dark:text-white">
-                      {projection.projectedBreachRooms}
-                    </div>
+                  <div className="pt-2 border-t border-slate-900/10 dark:border-white/10 flex flex-wrap items-center justify-between gap-1 text-[11px]">
+                    <span className="text-slate-600 dark:text-slate-400">
+                      RRL baseline loss:{' '}
+                      <strong className="font-tabular text-slate-900 dark:text-slate-100">
+                        {projection.baselineLossRangeLabel}
+                      </strong>
+                    </span>
+                    <span
+                      className={`font-tabular font-semibold ${
+                        projection.lossDeltaVsBaselinePct <= 0
+                          ? 'text-emerald-700 dark:text-emerald-300'
+                          : 'text-rose-700 dark:text-rose-300'
+                      }`}
+                    >
+                      {projection.lossDeltaVsBaselinePct <= 0
+                        ? `${Math.abs(projection.lossDeltaVsBaselinePct)}% below RRL mid`
+                        : `+${projection.lossDeltaVsBaselinePct}% vs RRL mid`}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -682,9 +724,9 @@ export function AlertsSettingsView() {
                 </label>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 items-end">
                 <label className="flex flex-col gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  <span>CO2 max (ppm)</span>
+                  <span>CO2 ventilation limit (ppm)</span>
                   <input
                     type="number"
                     step="10"
@@ -705,10 +747,10 @@ export function AlertsSettingsView() {
                 </label>
 
                 <label className="flex flex-col gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                  <span>Gas index max</span>
+                  <span>Ethylene / C2H4 limit (ppm)</span>
                   <input
                     type="number"
-                    step="0.1"
+                    step="5"
                     value={draftRule.gasIndexMax}
                     aria-invalid={Boolean(validationErrors.gasIndexMax)}
                     onChange={(e) =>
@@ -724,6 +766,64 @@ export function AlertsSettingsView() {
                     }`}
                   />
                 </label>
+
+                {selectedCrop === 'Tomato' && (
+                  <div className="sm:col-span-2 lg:col-span-3 flex flex-col gap-1.5">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Tomato maturity preset (Makule et al., 2022; SEARCA, 2022)
+                    </span>
+                    <div
+                      className="glass-recessed rounded-full p-1 inline-flex items-center gap-1 self-start"
+                      role="group"
+                      aria-label="Tomato maturity preset"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => handleTomatoPresetChange('mature_green')}
+                        className={`motion-snap min-h-[36px] px-3.5 rounded-full text-xs font-semibold cursor-pointer whitespace-nowrap ${
+                          (draftRule.maturityPreset ?? 'mature_green') ===
+                          'mature_green'
+                            ? 'pill-active'
+                            : 'text-slate-700 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-white/10'
+                        }`}
+                      >
+                        Mature-Green (10.0-13.0 °C)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleTomatoPresetChange('firm_ripe')}
+                        className={`motion-snap min-h-[36px] px-3.5 rounded-full text-xs font-semibold cursor-pointer whitespace-nowrap ${
+                          draftRule.maturityPreset === 'firm_ripe'
+                            ? 'pill-active'
+                            : 'text-slate-700 dark:text-slate-300 hover:bg-white/60 dark:hover:bg-white/10'
+                        }`}
+                      >
+                        Firm-Ripe (8.0-10.0 °C)
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* RRL Physiological Profile Reference Strip */}
+              <div className="glass-recessed rounded-[18px] px-4 py-3 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-slate-700 dark:text-slate-300">
+                <div>
+                  <span className="font-semibold text-slate-950 dark:text-white">
+                    {activeCropProfile.displayName}
+                  </span>{' '}
+                  <span className="italic text-slate-600 dark:text-slate-400">
+                    ({activeCropProfile.scientificName})
+                  </span>
+                  <span className="mx-2 text-slate-400">|</span>
+                  <span>{activeCropProfile.ethyleneNote}</span>
+                </div>
+                <div className="font-tabular text-slate-600 dark:text-slate-400">
+                  Baseline loss:{' '}
+                  <strong className="text-slate-900 dark:text-slate-100">
+                    {activeCropProfile.baselineLossRange}
+                  </strong>{' '}
+                  ({activeCropProfile.shelfLifeLimitDays}d storage limit)
+                </div>
               </div>
 
               {validationErrors.summary && (

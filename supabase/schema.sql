@@ -50,8 +50,8 @@ create table if not exists public.storage_rooms (
   max_temp numeric not null,
   min_humidity numeric not null default 90,
   max_humidity numeric not null default 98,
-  co2_max numeric not null default 1500,
-  gas_index_max numeric not null default 1.8,
+  co2_max numeric not null default 450,
+  gas_index_max numeric not null default 200,
   equipment_mode text not null default 'auto' check (
     equipment_mode in ('auto', 'boost', 'standby')
   ),
@@ -227,7 +227,7 @@ begin
   end if;
 end $$;
 
--- Idempotent baseline seed data for Benguet Highland Cooperative (Tomato & Broccoli)
+-- Idempotent baseline seed data for Benguet Highland Cooperative (RRL Matrix: Tomato & Broccoli)
 insert into public.storage_rooms (
   id,
   cooperative_id,
@@ -249,10 +249,10 @@ insert into public.storage_rooms (
   sensor_online
 )
 values
-  ('benguet-highland-room-a', 'benguet-highland', 'Benguet Highland', 'Room A', 'Broccoli', 4.6, 96.0, 710, 1.1, 0.0, 2.0, 95, 98, 1000, 1.2, 'boost', false, true),
-  ('benguet-highland-room-b', 'benguet-highland', 'Benguet Highland', 'Room B', 'Broccoli', 1.4, 96.0, 490, 0.6, 0.0, 2.0, 95, 98, 1000, 1.2, 'auto', false, true),
-  ('benguet-highland-room-c', 'benguet-highland', 'Benguet Highland', 'Room C', 'Tomato', 15.4, 91.2, 980, 1.6, 10.0, 12.5, 90, 95, 1500, 1.8, 'boost', false, true),
-  ('benguet-highland-room-d', 'benguet-highland', 'Benguet Highland', 'Room D', 'Tomato', 11.2, 92.5, 640, 0.9, 10.0, 12.5, 90, 95, 1500, 1.8, 'standby', false, false)
+  ('benguet-highland-room-a', 'benguet-highland', 'Benguet Highland', 'Room A', 'Broccoli', 4.6, 96.0, 390, 85, 0.0, 2.0, 95, 98, 450, 200, 'boost', false, true),
+  ('benguet-highland-room-b', 'benguet-highland', 'Benguet Highland', 'Room B', 'Broccoli', 1.2, 96.0, 365, 42, 0.0, 2.0, 95, 98, 450, 200, 'auto', false, true),
+  ('benguet-highland-room-c', 'benguet-highland', 'Benguet Highland', 'Room C', 'Tomato', 15.4, 88.0, 485, 215, 10.0, 13.0, 90, 95, 450, 200, 'boost', false, true),
+  ('benguet-highland-room-d', 'benguet-highland', 'Benguet Highland', 'Room D', 'Tomato', 9.0, 88.0, 380, 95, 8.0, 10.0, 85, 90, 450, 200, 'standby', false, false)
 on conflict (id) do update set
   crop = excluded.crop,
   temp_c = excluded.temp_c,
@@ -282,13 +282,13 @@ insert into public.batches (
   status
 )
 values
-  ('benguet-highland-B-001', 'benguet-highland', 'benguet-highland-room-a', 'R1', 'Broccoli', 420, 2, 10, 158, 145, 'active'),
-  ('benguet-highland-B-002', 'benguet-highland', 'benguet-highland-room-a', 'R2', 'Broccoli', 360, 4, 10, 152, 145, 'active'),
+  ('benguet-highland-B-001', 'benguet-highland', 'benguet-highland-room-a', 'R1', 'Broccoli', 420, 2, 14, 158, 145, 'active'),
+  ('benguet-highland-B-002', 'benguet-highland', 'benguet-highland-room-a', 'R2', 'Broccoli', 360, 4, 14, 152, 145, 'active'),
   ('benguet-highland-B-003', 'benguet-highland', 'benguet-highland-room-c', 'R1', 'Tomato', 680, 3, 14, 88, 82, 'active'),
   ('benguet-highland-B-004', 'benguet-highland', 'benguet-highland-room-c', 'R2', 'Tomato', 590, 6, 14, 84, 82, 'active'),
-  ('benguet-highland-B-005', 'benguet-highland', 'benguet-highland-room-b', 'R1', 'Broccoli', 510, 8, 10, 134, 148, 'active'),
-  ('benguet-highland-B-006', 'benguet-highland', 'benguet-highland-room-d', 'R1', 'Tomato', 920, 11, 14, 72, 85, 'active'),
-  ('benguet-highland-B-007', 'benguet-highland', 'benguet-highland-room-b', 'R2', 'Broccoli', 440, 9, 10, 128, 148, 'active')
+  ('benguet-highland-B-005', 'benguet-highland', 'benguet-highland-room-b', 'R1', 'Broccoli', 510, 9, 14, 134, 148, 'active'),
+  ('benguet-highland-B-006', 'benguet-highland', 'benguet-highland-room-d', 'R1', 'Tomato', 920, 7, 8, 72, 85, 'active'),
+  ('benguet-highland-B-007', 'benguet-highland', 'benguet-highland-room-b', 'R2', 'Broccoli', 440, 12, 14, 128, 148, 'active')
 on conflict (id) do update set
   room_id = excluded.room_id,
   rack_id = excluded.rack_id,
@@ -310,7 +310,7 @@ insert into public.alerts (
 )
 values
   ('10000000-0000-4000-8000-000000000001', 'benguet-highland', 'benguet-highland-room-a', 'Temperature high', 'critical', 'Room A temperature above range (4.6 °C, floret yellowing risk)', false),
-  ('10000000-0000-4000-8000-000000000002', 'benguet-highland', 'benguet-highland-room-c', 'Temperature high', 'critical', 'Room C temperature above range (15.4 °C, accelerated ripening risk)', false),
+  ('10000000-0000-4000-8000-000000000002', 'benguet-highland', 'benguet-highland-room-c', 'Temperature high', 'critical', 'Room C temperature above range (15.4 °C, accelerated ripening risk; CO2 485 ppm, C2H4 215 ppm)', false),
   ('10000000-0000-4000-8000-000000000003', 'benguet-highland', 'benguet-highland-room-d', 'Sensor offline', 'no_data', 'Room D sensor offline since 05:14', false)
 on conflict (id) do update set
   room_id = excluded.room_id,

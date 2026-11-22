@@ -1,12 +1,17 @@
 import React, { useMemo, useState } from 'react';
 import { ArrowUpDown, CalendarClock, Plus, RotateCcw } from 'lucide-react';
 import { usePostharvest } from '../context/PostharvestContext';
-import { CROP_LIST } from '../data/seedData';
-import type { CropType, RecommendationStatus } from '../types/postharvest';
+import { CROP_LIST, CROP_PROFILES } from '../data/seedData';
+import type {
+  CropType,
+  RecommendationStatus,
+  TomatoMaturityPreset,
+} from '../types/postharvest';
 import { formatCropLabel, getUiCopy } from '../utils/i18n';
 import {
   computeBatchRecommendation,
   evaluateRoomStatus,
+  resolveRoomRule,
 } from '../utils/postharvestEngine';
 import { FilterPopover } from '../components/ui/FilterPopover';
 import { GlassCard } from '../components/ui/GlassCard';
@@ -48,10 +53,12 @@ export function InventoryView() {
   // Add batch modal state
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [newCrop, setNewCrop] = useState<CropType>('Broccoli');
+  const [newTomatoPreset, setNewTomatoPreset] =
+    useState<TomatoMaturityPreset>('mature_green');
   const [newRoomId, setNewRoomId] = useState<string>('room-a');
   const [newRackId, setNewRackId] = useState<string>('R1');
   const [newQty, setNewQty] = useState<string>('320');
-  const [newShelfLife, setNewShelfLife] = useState<string>('10');
+  const [newShelfLife, setNewShelfLife] = useState<string>('14');
   const [newCurrentPrice, setNewCurrentPrice] = useState<string>('152');
   const [newTargetPrice, setNewTargetPrice] = useState<string>('145');
   const [addError, setAddError] = useState<string | null>(null);
@@ -60,7 +67,7 @@ export function InventoryView() {
     return state.batches.map((batch) => {
       const room = state.rooms.find((r) => r.id === batch.roomId);
       const roomEval = room
-        ? evaluateRoomStatus(room, state.rules[room.crop])
+        ? evaluateRoomStatus(room, resolveRoomRule(room, state.rules))
         : {
             severity: 'in_range' as const,
             primaryMetric: null,
@@ -193,9 +200,15 @@ export function InventoryView() {
     }
 
     const todayIso = new Date().toISOString().slice(0, 10);
-    const baselineLimit = newCrop === 'Tomato' ? 14 : 10;
+    const baselineLimit =
+      newCrop === 'Tomato'
+        ? newTomatoPreset === 'firm_ripe'
+          ? CROP_PROFILES.tomato_firm_ripe.shelfLifeLimitDays
+          : CROP_PROFILES.tomato_mature_green.shelfLifeLimitDays
+        : CROP_PROFILES.broccoli.shelfLifeLimitDays;
     addBatch({
       crop: newCrop,
+      maturityPreset: newCrop === 'Tomato' ? newTomatoPreset : undefined,
       roomId: newRoomId,
       rackId: newRackId,
       qtyKg: Math.round(qtyKg),
@@ -701,14 +714,22 @@ export function InventoryView() {
                 onChange={(e) => {
                   const crop = e.target.value as CropType;
                   setNewCrop(crop);
-                  const matchingRoom = state.rooms.find((r) => r.crop === crop);
-                  if (matchingRoom) setNewRoomId(matchingRoom.id);
                   if (crop === 'Tomato') {
-                    setNewShelfLife('14');
-                    setNewCurrentPrice('86');
+                    const preset = newTomatoPreset;
+                    const matchingRoom =
+                      state.rooms.find(
+                        (r) => r.crop === 'Tomato' && r.maturityPreset === preset
+                      ) ?? state.rooms.find((r) => r.crop === 'Tomato');
+                    if (matchingRoom) setNewRoomId(matchingRoom.id);
+                    setNewShelfLife(preset === 'firm_ripe' ? '8' : '14');
+                    setNewCurrentPrice(preset === 'firm_ripe' ? '76' : '86');
                     setNewTargetPrice('82');
                   } else {
-                    setNewShelfLife('10');
+                    const matchingRoom = state.rooms.find(
+                      (r) => r.crop === 'Broccoli'
+                    );
+                    if (matchingRoom) setNewRoomId(matchingRoom.id);
+                    setNewShelfLife('14');
                     setNewCurrentPrice('152');
                     setNewTargetPrice('145');
                   }
@@ -723,6 +744,34 @@ export function InventoryView() {
               </select>
             </label>
 
+            {newCrop === 'Tomato' && (
+              <label className="flex flex-col gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
+                <span>Tomato maturity preset</span>
+                <select
+                  value={newTomatoPreset}
+                  onChange={(e) => {
+                    const preset = e.target.value as TomatoMaturityPreset;
+                    setNewTomatoPreset(preset);
+                    const matchingRoom =
+                      state.rooms.find(
+                        (r) => r.crop === 'Tomato' && r.maturityPreset === preset
+                      ) ?? state.rooms.find((r) => r.crop === 'Tomato');
+                    if (matchingRoom) setNewRoomId(matchingRoom.id);
+                    setNewShelfLife(preset === 'firm_ripe' ? '8' : '14');
+                    setNewCurrentPrice(preset === 'firm_ripe' ? '76' : '86');
+                  }}
+                  className="glass-recessed min-h-[44px] px-3 rounded-[14px] text-sm text-slate-950 dark:text-white bg-transparent"
+                >
+                  <option value="mature_green" className="text-slate-900">
+                    Mature-Green (10.0-13.0 °C, 90-95% RH, 14d)
+                  </option>
+                  <option value="firm_ripe" className="text-slate-900">
+                    Firm-Ripe (8.0-10.0 °C, 85-90% RH, 8d)
+                  </option>
+                </select>
+              </label>
+            )}
+
             <label className="flex flex-col gap-1.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
               <span>Storage room</span>
               <select
@@ -732,7 +781,8 @@ export function InventoryView() {
               >
                 {state.rooms.map((room) => (
                   <option key={room.id} value={room.id} className="text-slate-900">
-                    {room.name} ({formatCropLabel(room.crop, state.language)})
+                    {room.name} ({formatCropLabel(room.crop, state.language)}
+                    {room.variety ? `, ${room.variety}` : ''})
                   </option>
                 ))}
               </select>

@@ -28,7 +28,7 @@ import type {
   StorageRoom,
   UserProfile,
 } from '../types/postharvest';
-import { formatTimeHHMM } from '../utils/postharvestEngine';
+import { formatTimeHHMM, resolveRoomRule } from '../utils/postharvestEngine';
 
 const VALID_CROPS: CropType[] = ['Tomato', 'Broccoli'];
 
@@ -43,7 +43,14 @@ function toMetric(
   if (lower.includes('temp')) return 'temperature';
   if (lower.includes('hum')) return 'humidity';
   if (lower.includes('co2')) return 'co2';
-  if (lower.includes('gas') || lower.includes('spoilage')) return 'gas';
+  if (
+    lower.includes('gas') ||
+    lower.includes('spoilage') ||
+    lower.includes('ethylene') ||
+    lower.includes('c2h4')
+  ) {
+    return 'gas';
+  }
   return 'sensor';
 }
 
@@ -60,6 +67,7 @@ export function mapStorageRoomRow(
     name: row.name,
     crop,
     variety: existing?.variety ?? seedMatch?.variety,
+    maturityPreset: existing?.maturityPreset ?? seedMatch?.maturityPreset,
     online: Boolean(row.sensor_online),
     offlineSince: row.sensor_online
       ? undefined
@@ -135,8 +143,12 @@ export function extractRulesFromRooms(
   baseRules: Record<CropType, CropThresholdRule> = DEFAULT_CROP_RULES
 ): Record<CropType, CropThresholdRule> {
   const next: Record<CropType, CropThresholdRule> = { ...baseRules };
+  const seenCrops = new Set<CropType>();
   for (const row of rows) {
     const crop = toCropType(row.crop);
+    // Keep the first matching room (Mature-Green for Tomato) as the default crop rule
+    if (seenCrops.has(crop)) continue;
+    seenCrops.add(crop);
     next[crop] = {
       ...next[crop],
       crop,
@@ -209,7 +221,7 @@ async function seedCooperativeIfEmpty(
   }
 
   const roomInserts = INITIAL_ROOMS.map((room) => {
-    const rule = DEFAULT_CROP_RULES[room.crop];
+    const rule = resolveRoomRule(room, DEFAULT_CROP_RULES);
     return {
       id: `${cooperativeId}-${room.id}`,
       cooperative_id: cooperativeId,

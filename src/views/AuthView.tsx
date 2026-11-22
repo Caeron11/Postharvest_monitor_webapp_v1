@@ -5,6 +5,7 @@ import type { UserRole } from '../types/postharvest';
 import { formatCropLabel, getUiCopy } from '../utils/i18n';
 import {
   evaluateRoomStatus,
+  resolveRoomRule,
   sortRoomsBySeverity,
   validateAuthForm,
 } from '../utils/postharvestEngine';
@@ -215,7 +216,10 @@ export function AuthView() {
           <GlassCard tier="surface" radius="outer" className="p-4">
             <div className="glass-recessed rounded-[18px] divide-y divide-slate-900/8 dark:divide-white/8">
               {previewRooms.map((room) => {
-                const ev = evaluateRoomStatus(room, state.rules[room.crop]);
+                const ev = evaluateRoomStatus(
+                  room,
+                  resolveRoomRule(room, state.rules)
+                );
                 return (
                   <div
                     key={room.id}

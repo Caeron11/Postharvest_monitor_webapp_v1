@@ -11,6 +11,34 @@ export type UserRole =
 
 export type CropType = 'Tomato' | 'Broccoli';
 
+export type TomatoMaturityPreset = 'mature_green' | 'firm_ripe';
+
+export type CropProfileId =
+  | 'broccoli'
+  | 'tomato_mature_green'
+  | 'tomato_firm_ripe';
+
+export interface CropProfileMetadata {
+  id: CropProfileId;
+  crop: CropType;
+  maturityPreset?: TomatoMaturityPreset;
+  displayName: string;
+  scientificName: string;
+  tempMin: number;
+  tempMax: number;
+  rhMin: number;
+  rhMax: number;
+  co2MaxPpm: number;
+  ethyleneMaxPpm: number;
+  ethyleneNote: string;
+  shelfLifeLimitDays: number;
+  baselineLossRange: string;
+  baselineLossMinPct: number;
+  baselineLossMaxPct: number;
+  retailLossNote: string;
+  sources: string;
+}
+
 export type SeverityLevel = 'critical' | 'warning' | 'no_data' | 'in_range';
 
 export type MetricState = 'above' | 'below' | 'rising' | 'in_range' | 'no_data';
@@ -62,7 +90,7 @@ export interface TelemetryPoint {
   tempC: number;
   humidityPct: number;
   co2Ppm: number;
-  gasIndex: number;
+  gasIndex: number; // Ethylene / C2H4 concentration in ppm
 }
 
 export interface RackBay {
@@ -76,12 +104,13 @@ export interface StorageRoom {
   name: string;
   crop: CropType;
   variety?: string;
+  maturityPreset?: TomatoMaturityPreset;
   online: boolean;
   offlineSince?: string;
   tempC: number;
   humidityPct: number;
   co2Ppm: number;
-  gasIndex: number;
+  gasIndex: number; // Ethylene / C2H4 concentration in ppm
   gasRising: boolean;
   breachDurationMin: number;
   compressorMode: CompressorMode;
@@ -93,12 +122,13 @@ export interface StorageRoom {
 
 export interface CropThresholdRule {
   crop: CropType;
+  maturityPreset?: TomatoMaturityPreset;
   tempMin: number;
   tempMax: number;
   humidityMin: number;
   humidityMax: number;
-  co2Max: number;
-  gasIndexMax: number;
+  co2Max: number; // Ventilation limit in ppm (default <= 450 ppm)
+  gasIndexMax: number; // Ethylene / C2H4 ventilation limit in ppm (default <= 200 ppm)
   tempHoldMinutes: number;
   notifyInApp: boolean;
   notifySms: boolean;
@@ -123,6 +153,7 @@ export interface PricePoint {
 export interface InventoryBatch {
   id: string;
   crop: CropType;
+  maturityPreset?: TomatoMaturityPreset;
   roomId: string;
   rackId: string;
   qtyKg: number;
@@ -180,6 +211,9 @@ export interface ScenarioProjection {
   shelfLifeDeltaDays: number;
   projectedBreachRooms: number;
   peakTempDeltaC: number;
+  baselineLossMidPct: number;
+  baselineLossRangeLabel: string;
+  lossDeltaVsBaselinePct: number;
 }
 
 export interface FacilityKpis {

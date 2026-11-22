@@ -1,5 +1,7 @@
 import type {
   AlertItem,
+  CropProfileId,
+  CropProfileMetadata,
   CropThresholdRule,
   CropType,
   GlassSettings,
@@ -9,13 +11,113 @@ import type {
   PricePoint,
   StorageRoom,
   TelemetryPoint,
+  TomatoMaturityPreset,
   UserProfile,
 } from '../types/postharvest';
 import { syncAlertsWithRooms } from '../utils/postharvestEngine';
 
-export const STATE_SCHEMA_VERSION = 3;
+export const STATE_SCHEMA_VERSION = 4;
 
 export const CROP_LIST: CropType[] = ['Broccoli', 'Tomato'];
+
+export const CROP_PROFILES: Record<CropProfileId, CropProfileMetadata> = {
+  broccoli: {
+    id: 'broccoli',
+    crop: 'Broccoli',
+    displayName: 'Broccoli',
+    scientificName: 'Brassica oleracea var. italica',
+    tempMin: 0.0,
+    tempMax: 2.0,
+    rhMin: 95,
+    rhMax: 98,
+    co2MaxPpm: 450,
+    ethyleneMaxPpm: 200,
+    ethyleneNote:
+      'Very low ethylene production (< 0.1 uL/kg-h), high ethylene sensitivity',
+    shelfLifeLimitDays: 14,
+    baselineLossRange: '17.70% - 23.03%',
+    baselineLossMinPct: 17.7,
+    baselineLossMaxPct: 23.03,
+    retailLossNote: 'Farm-to-trading post / Buguias benchmark; 26% retail',
+    sources: 'Antolin & Malanon (2025), Makule et al. (2022), Mohammed et al. (2022)',
+  },
+  tomato_mature_green: {
+    id: 'tomato_mature_green',
+    crop: 'Tomato',
+    maturityPreset: 'mature_green',
+    displayName: 'Tomato (Mature-Green)',
+    scientificName: 'Solanum lycopersicum',
+    tempMin: 10.0,
+    tempMax: 13.0,
+    rhMin: 90,
+    rhMax: 95,
+    co2MaxPpm: 450,
+    ethyleneMaxPpm: 200,
+    ethyleneNote:
+      'High ethylene sensitivity; chilling injury occurs below 10.0 °C',
+    shelfLifeLimitDays: 14,
+    baselineLossRange: '10.94% - 24.14%',
+    baselineLossMinPct: 10.94,
+    baselineLossMaxPct: 24.14,
+    retailLossNote: 'Farm-to-market routes; 14%-18% public markets; up to 30% midstream',
+    sources:
+      'SEARCA (2022), Bayogan, Urquiola, et al. (2023), Digal et al. (2024), Makule et al. (2022), Mohammed et al. (2022)',
+  },
+  tomato_firm_ripe: {
+    id: 'tomato_firm_ripe',
+    crop: 'Tomato',
+    maturityPreset: 'firm_ripe',
+    displayName: 'Tomato (Firm-Ripe)',
+    scientificName: 'Solanum lycopersicum',
+    tempMin: 8.0,
+    tempMax: 10.0,
+    rhMin: 85,
+    rhMax: 90,
+    co2MaxPpm: 450,
+    ethyleneMaxPpm: 200,
+    ethyleneNote:
+      'High ethylene production; isolate from ethylene-sensitive Broccoli',
+    shelfLifeLimitDays: 8,
+    baselineLossRange: '14.00% - 18.00%',
+    baselineLossMinPct: 14.0,
+    baselineLossMaxPct: 18.0,
+    retailLossNote: 'Public market benchmark; up to 30% midstream without cold chain',
+    sources:
+      'SEARCA (2022), Makule et al. (2022), Beaulah et al. (2025), Mohammed et al. (2022)',
+  },
+};
+
+export const TOMATO_MATURITY_PRESETS: Record<
+  TomatoMaturityPreset,
+  CropThresholdRule
+> = {
+  mature_green: {
+    crop: 'Tomato',
+    maturityPreset: 'mature_green',
+    tempMin: 10.0,
+    tempMax: 13.0,
+    humidityMin: 90,
+    humidityMax: 95,
+    co2Max: 450,
+    gasIndexMax: 200,
+    tempHoldMinutes: 20,
+    notifyInApp: true,
+    notifySms: true,
+  },
+  firm_ripe: {
+    crop: 'Tomato',
+    maturityPreset: 'firm_ripe',
+    tempMin: 8.0,
+    tempMax: 10.0,
+    humidityMin: 85,
+    humidityMax: 90,
+    co2Max: 450,
+    gasIndexMax: 200,
+    tempHoldMinutes: 20,
+    notifyInApp: true,
+    notifySms: true,
+  },
+};
 
 export const DEFAULT_GLASS_SETTINGS: GlassSettings = {
   blurPx: 24,
@@ -45,23 +147,14 @@ export const DEFAULT_CROP_RULES: Record<CropType, CropThresholdRule> = {
     tempMax: 2.0,
     humidityMin: 95,
     humidityMax: 98,
-    co2Max: 1000,
-    gasIndexMax: 1.2,
+    co2Max: 450,
+    gasIndexMax: 200,
     tempHoldMinutes: 15,
     notifyInApp: true,
     notifySms: true,
   },
   Tomato: {
-    crop: 'Tomato',
-    tempMin: 10.0,
-    tempMax: 12.5,
-    humidityMin: 90,
-    humidityMax: 95,
-    co2Max: 1500,
-    gasIndexMax: 1.8,
-    tempHoldMinutes: 20,
-    notifyInApp: true,
-    notifySms: true,
+    ...TOMATO_MATURITY_PRESETS.mature_green,
   },
 };
 
@@ -69,7 +162,7 @@ function buildSeries(
   temps: number[],
   hums: number[],
   co2s: number[],
-  gases: number[]
+  ethylenesPpm: number[]
 ): TelemetryPoint[] {
   const labels = [
     '06:00',
@@ -87,7 +180,7 @@ function buildSeries(
     tempC: temps[i],
     humidityPct: hums[i],
     co2Ppm: co2s[i],
-    gasIndex: gases[i],
+    gasIndex: ethylenesPpm[i],
   }));
 }
 
@@ -100,9 +193,9 @@ export const INITIAL_ROOMS: StorageRoom[] = [
     online: true,
     tempC: 4.6,
     humidityPct: 96.0,
-    co2Ppm: 710,
-    gasIndex: 1.1,
-    gasRising: true,
+    co2Ppm: 390,
+    gasIndex: 85,
+    gasRising: false,
     breachDurationMin: 38,
     compressorMode: 'boost',
     defrostActive: false,
@@ -113,10 +206,10 @@ export const INITIAL_ROOMS: StorageRoom[] = [
       { id: 'R3', label: 'Rack R3', capacityKg: 500 },
     ],
     history24h: buildSeries(
-      [1.2, 1.4, 1.8, 2.2, 2.7, 3.3, 3.8, 4.2, 4.6],
+      [1.2, 1.5, 1.9, 2.3, 2.8, 3.3, 3.8, 4.2, 4.6],
       [96.8, 96.6, 96.5, 96.4, 96.3, 96.2, 96.1, 96.0, 96.0],
-      [460, 490, 520, 555, 590, 625, 655, 685, 710],
-      [0.5, 0.6, 0.6, 0.7, 0.8, 0.9, 1.0, 1.0, 1.1]
+      [340, 348, 355, 362, 370, 376, 382, 386, 390],
+      [40, 46, 52, 58, 64, 70, 76, 81, 85]
     ),
   },
   {
@@ -125,10 +218,10 @@ export const INITIAL_ROOMS: StorageRoom[] = [
     crop: 'Broccoli',
     variety: 'Highland Florets',
     online: true,
-    tempC: 1.4,
+    tempC: 1.2,
     humidityPct: 96.0,
-    co2Ppm: 490,
-    gasIndex: 0.6,
+    co2Ppm: 365,
+    gasIndex: 42,
     gasRising: false,
     breachDurationMin: 0,
     compressorMode: 'auto',
@@ -140,22 +233,23 @@ export const INITIAL_ROOMS: StorageRoom[] = [
       { id: 'R3', label: 'Rack R3', capacityKg: 600 },
     ],
     history24h: buildSeries(
-      [1.3, 1.4, 1.5, 1.4, 1.3, 1.4, 1.5, 1.4, 1.4],
+      [1.1, 1.2, 1.3, 1.2, 1.1, 1.2, 1.3, 1.2, 1.2],
       [96.2, 96.1, 96.0, 95.9, 96.1, 96.2, 96.0, 95.9, 96.0],
-      [465, 470, 480, 485, 478, 482, 488, 492, 490],
-      [0.5, 0.5, 0.6, 0.6, 0.6, 0.5, 0.6, 0.6, 0.6]
+      [350, 354, 358, 360, 358, 361, 364, 366, 365],
+      [36, 38, 40, 41, 40, 41, 42, 43, 42]
     ),
   },
   {
     id: 'room-c',
     name: 'Room C',
     crop: 'Tomato',
-    variety: 'Breaker Stage',
+    variety: 'Mature-Green',
+    maturityPreset: 'mature_green',
     online: true,
     tempC: 15.4,
-    humidityPct: 91.2,
-    co2Ppm: 980,
-    gasIndex: 1.6,
+    humidityPct: 88.0,
+    co2Ppm: 485,
+    gasIndex: 215,
     gasRising: true,
     breachDurationMin: 72,
     compressorMode: 'boost',
@@ -167,23 +261,24 @@ export const INITIAL_ROOMS: StorageRoom[] = [
       { id: 'R3', label: 'Rack R3', capacityKg: 800 },
     ],
     history24h: buildSeries(
-      [11.2, 11.6, 12.1, 12.8, 13.4, 14.0, 14.6, 15.1, 15.4],
-      [93.0, 92.7, 92.4, 92.2, 91.9, 91.7, 91.5, 91.3, 91.2],
-      [620, 670, 725, 770, 815, 860, 905, 945, 980],
-      [0.9, 1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.5, 1.6]
+      [11.4, 11.9, 12.5, 13.1, 13.7, 14.2, 14.7, 15.1, 15.4],
+      [92.5, 91.8, 91.2, 90.6, 90.0, 89.4, 88.9, 88.4, 88.0],
+      [370, 385, 402, 418, 432, 448, 462, 474, 485],
+      [110, 124, 138, 152, 166, 180, 194, 205, 215]
     ),
   },
   {
     id: 'room-d',
     name: 'Room D',
     crop: 'Tomato',
-    variety: 'Pink-Red Grade A',
+    variety: 'Firm-Ripe',
+    maturityPreset: 'firm_ripe',
     online: false,
     offlineSince: '05:14',
-    tempC: 11.2,
-    humidityPct: 92.5,
-    co2Ppm: 640,
-    gasIndex: 0.9,
+    tempC: 9.0,
+    humidityPct: 88.0,
+    co2Ppm: 380,
+    gasIndex: 95,
     gasRising: false,
     breachDurationMin: 0,
     compressorMode: 'standby',
@@ -195,10 +290,10 @@ export const INITIAL_ROOMS: StorageRoom[] = [
       { id: 'R3', label: 'Rack R3', capacityKg: 1000 },
     ],
     history24h: buildSeries(
-      [11.0, 11.1, 11.2, 11.3, 11.2, 11.1, 11.2, 11.2, 11.2],
-      [92.8, 92.6, 92.5, 92.4, 92.6, 92.5, 92.4, 92.5, 92.5],
-      [615, 620, 628, 635, 632, 638, 642, 640, 640],
-      [0.8, 0.8, 0.9, 0.9, 0.9, 0.8, 0.9, 0.9, 0.9]
+      [8.9, 9.0, 9.1, 9.0, 8.9, 9.0, 9.1, 9.0, 9.0],
+      [88.4, 88.2, 88.0, 87.9, 88.1, 88.0, 87.9, 88.0, 88.0],
+      [365, 368, 372, 375, 374, 378, 380, 381, 380],
+      [84, 86, 88, 90, 91, 92, 94, 95, 95]
     ),
   },
 ];
@@ -212,7 +307,7 @@ export const INITIAL_BATCHES: InventoryBatch[] = [
     qtyKg: 420,
     harvestedDate: '2026-11-16',
     shelfLifeDays: 2,
-    shelfLifeLimitDays: 10,
+    shelfLifeLimitDays: 14,
     currentPricePhp: 158,
     targetPricePhp: 145,
     manualHold: false,
@@ -226,7 +321,7 @@ export const INITIAL_BATCHES: InventoryBatch[] = [
     qtyKg: 360,
     harvestedDate: '2026-11-17',
     shelfLifeDays: 4,
-    shelfLifeLimitDays: 10,
+    shelfLifeLimitDays: 14,
     currentPricePhp: 152,
     targetPricePhp: 145,
     manualHold: false,
@@ -235,6 +330,7 @@ export const INITIAL_BATCHES: InventoryBatch[] = [
   {
     id: 'B-003',
     crop: 'Tomato',
+    maturityPreset: 'mature_green',
     roomId: 'room-c',
     rackId: 'R1',
     qtyKg: 680,
@@ -249,6 +345,7 @@ export const INITIAL_BATCHES: InventoryBatch[] = [
   {
     id: 'B-004',
     crop: 'Tomato',
+    maturityPreset: 'mature_green',
     roomId: 'room-c',
     rackId: 'R2',
     qtyKg: 590,
@@ -267,8 +364,8 @@ export const INITIAL_BATCHES: InventoryBatch[] = [
     rackId: 'R1',
     qtyKg: 510,
     harvestedDate: '2026-11-18',
-    shelfLifeDays: 8,
-    shelfLifeLimitDays: 10,
+    shelfLifeDays: 9,
+    shelfLifeLimitDays: 14,
     currentPricePhp: 134,
     targetPricePhp: 148,
     manualHold: false,
@@ -277,12 +374,13 @@ export const INITIAL_BATCHES: InventoryBatch[] = [
   {
     id: 'B-006',
     crop: 'Tomato',
+    maturityPreset: 'firm_ripe',
     roomId: 'room-d',
     rackId: 'R1',
     qtyKg: 920,
     harvestedDate: '2026-11-17',
-    shelfLifeDays: 11,
-    shelfLifeLimitDays: 14,
+    shelfLifeDays: 7,
+    shelfLifeLimitDays: 8,
     currentPricePhp: 72,
     targetPricePhp: 85,
     manualHold: false,
@@ -295,8 +393,8 @@ export const INITIAL_BATCHES: InventoryBatch[] = [
     rackId: 'R2',
     qtyKg: 440,
     harvestedDate: '2026-11-19',
-    shelfLifeDays: 9,
-    shelfLifeLimitDays: 10,
+    shelfLifeDays: 12,
+    shelfLifeLimitDays: 14,
     currentPricePhp: 128,
     targetPricePhp: 148,
     manualHold: false,
@@ -343,7 +441,8 @@ export const INITIAL_ALERTS: AlertItem[] = [
     roomName: 'Room C',
     metric: 'temperature',
     typeLabel: 'Temperature high',
-    message: 'Room C temperature above range (15.4 °C, accelerated ripening risk)',
+    message:
+      'Room C temperature above range (15.4 °C, accelerated ripening risk; CO2 485 ppm, C2H4 215 ppm)',
     severity: 'critical',
     timestamp: '06:18',
     acknowledged: false,

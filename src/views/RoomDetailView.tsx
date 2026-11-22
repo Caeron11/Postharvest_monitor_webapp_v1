@@ -3,7 +3,7 @@ import { ArrowLeft, Fan, Power, SlidersHorizontal, Snowflake } from 'lucide-reac
 import { usePostharvest } from '../context/PostharvestContext';
 import type { CompressorMode } from '../types/postharvest';
 import { formatCropLabel, getUiCopy } from '../utils/i18n';
-import { evaluateRoomStatus } from '../utils/postharvestEngine';
+import { evaluateRoomStatus, resolveRoomRule } from '../utils/postharvestEngine';
 import { GlassCard } from '../components/ui/GlassCard';
 import {
   metricStateToBadge,
@@ -28,7 +28,7 @@ export function RoomDetailView() {
   const copy = getUiCopy(state.language);
   const room =
     state.rooms.find((r) => r.id === state.selectedRoomId) ?? state.rooms[0];
-  const rule = state.rules[room.crop];
+  const rule = resolveRoomRule(room, state.rules);
   const evaluation = evaluateRoomStatus(room, rule);
 
   const roomBatches = state.batches.filter(
@@ -132,21 +132,21 @@ export function RoomDetailView() {
 
           <GlassCard tier="surface" radius="outer" specular className="p-5 flex flex-col justify-between gap-3">
             <span className="text-xs font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-400">
-              CO2
+              CO2 · Ventilation Limit (ppm)
             </span>
             <div className="font-tabular text-3xl font-bold text-slate-950 dark:text-white">
-              {room.online ? `${room.co2Ppm} ppm` : '--- ppm'}
+              {room.online ? `${Math.round(room.co2Ppm)} ppm` : '--- ppm'}
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <span className="font-tabular text-xs text-slate-600 dark:text-slate-400">
-                Target: below {rule.co2Max} ppm
+                Target: &lt;= {Math.round(rule.co2Max)} ppm
               </span>
               <StatusBadge tone={co2Badge.tone} label={co2Badge.label} compact />
             </div>
           </GlassCard>
         </div>
 
-        {/* Asymmetric Split: 55% Spoilage-Gas Index / 45% Equipment & Sensor Controls */}
+        {/* Asymmetric Split: Ethylene / C2H4 Ventilation Limit & Equipment Controls */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
           <GlassCard
             tier="surface"
@@ -156,13 +156,13 @@ export function RoomDetailView() {
           >
             <div className="flex flex-col gap-1.5">
               <span className="text-xs font-semibold tracking-wide uppercase text-slate-600 dark:text-slate-400">
-                Spoilage-gas index
+                Ethylene / C2H4 · Ventilation Limit (ppm)
               </span>
               <div className="font-tabular text-3xl font-bold text-slate-950 dark:text-white">
-                {room.online ? room.gasIndex.toFixed(1) : '--.-'}
+                {room.online ? `${Math.round(room.gasIndex)} ppm` : '--- ppm'}
               </div>
               <span className="font-tabular text-xs text-slate-600 dark:text-slate-400">
-                Target: below {rule.gasIndexMax.toFixed(1)}
+                Target: &lt;= {Math.round(rule.gasIndexMax)} ppm
               </span>
             </div>
             <StatusBadge tone={gasBadge.tone} label={gasBadge.label} />
@@ -252,17 +252,17 @@ export function RoomDetailView() {
 
         <GlassCard tier="surface" radius="outer" className="p-5">
           <DualTrendChart
-            title="CO2 and gas index, last 24 h"
+            title="CO2 and Ethylene (C2H4) ventilation, last 24 h"
             points={room.history24h}
             solidKey="co2Ppm"
             solidLabel="CO2"
             solidUnit="ppm"
             dashedKey="gasIndex"
-            dashedLabel="Gas"
-            dashedUnit="idx"
+            dashedLabel="C2H4"
+            dashedUnit="ppm"
             targetMin={300}
             targetMax={rule.co2Max}
-            legendNote="Solid: CO2. Dashed: gas index. Shaded: acceptable range."
+            legendNote={`Solid: CO2 (ppm). Dashed: C2H4 (ppm). Shaded: CO2 ventilation limit (<= ${Math.round(rule.co2Max)} ppm).`}
             offline={!room.online}
             offlineSince={room.offlineSince}
             onReconnect={() => toggleSensorOnline(room.id)}
@@ -431,13 +431,13 @@ export function RoomDetailView() {
 
               <div className="glass-recessed rounded-[18px] p-3.5 flex flex-col gap-2">
                 <p className="text-sm text-slate-800 dark:text-slate-200">
-                  CO2 above{' '}
+                  Ventilation limit: CO2 above{' '}
                   <span className="font-tabular font-semibold">
-                    {rule.co2Max} ppm
+                    {Math.round(rule.co2Max)} ppm
                   </span>{' '}
-                  or gas above{' '}
+                  or C2H4 above{' '}
                   <span className="font-tabular font-semibold">
-                    {rule.gasIndexMax.toFixed(1)}
+                    {Math.round(rule.gasIndexMax)} ppm
                   </span>
                 </p>
                 <div className="self-start">

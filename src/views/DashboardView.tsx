@@ -5,6 +5,7 @@ import { formatCropLabel, getUiCopy } from '../utils/i18n';
 import {
   computeBatchRecommendation,
   evaluateRoomStatus,
+  resolveRoomRule,
   sortRoomsBySeverity,
 } from '../utils/postharvestEngine';
 import { GlassCard } from '../components/ui/GlassCard';
@@ -40,7 +41,7 @@ export function DashboardView() {
     .map((batch) => {
       const room = state.rooms.find((r) => r.id === batch.roomId);
       const roomEval = room
-        ? evaluateRoomStatus(room, state.rules[room.crop])
+        ? evaluateRoomStatus(room, resolveRoomRule(room, state.rules))
         : {
             severity: 'in_range' as const,
             primaryMetric: null,
@@ -258,7 +259,10 @@ export function DashboardView() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             {sortedRooms.map((room) => {
-              const evaluation = evaluateRoomStatus(room, state.rules[room.crop]);
+              const evaluation = evaluateRoomStatus(
+                room,
+                resolveRoomRule(room, state.rules)
+              );
               return (
                 <div
                   key={room.id}
@@ -310,10 +314,10 @@ export function DashboardView() {
                         </div>
                         <div className="flex items-center justify-between gap-1.5">
                           <dt className="text-slate-600 dark:text-slate-400 whitespace-nowrap">
-                            Gas index
+                            C2H4
                           </dt>
                           <dd className="font-tabular font-semibold text-slate-950 dark:text-white whitespace-nowrap">
-                            {room.gasIndex.toFixed(1)}
+                            {Math.round(room.gasIndex)} ppm
                           </dd>
                         </div>
                       </dl>

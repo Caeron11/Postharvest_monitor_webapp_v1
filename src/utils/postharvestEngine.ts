@@ -21,6 +21,52 @@ export const SEVERITY_RANK: Record<SeverityLevel, number> = {
   in_range: 3,
 };
 
+const RRL_BASELINE_LOSS_BANDS = {
+  Broccoli: { min: 17.7, max: 23.03 },
+  tomato_mature_green: { min: 10.94, max: 24.14 },
+  tomato_firm_ripe: { min: 14.0, max: 18.0 },
+};
+
+/**
+ * Resolves the active threshold rule for a specific storage room, honoring
+ * Tomato maturity presets (Mature-Green 10.0-13.0 C / 90-95% RH vs
+ * Firm-Ripe 8.0-10.0 C / 85-90% RH) while inheriting facility-wide gas
+ * ventilation and notification settings from the crop rule.
+ */
+export function resolveRoomRule(
+  room: StorageRoom,
+  rules: Record<CropType, CropThresholdRule>
+): CropThresholdRule {
+  const baseRule = rules[room.crop];
+  if (room.crop !== 'Tomato' || !room.maturityPreset) {
+    return baseRule;
+  }
+
+  if (baseRule.maturityPreset === room.maturityPreset) {
+    return baseRule;
+  }
+
+  if (room.maturityPreset === 'firm_ripe') {
+    return {
+      ...baseRule,
+      maturityPreset: 'firm_ripe',
+      tempMin: 8.0,
+      tempMax: 10.0,
+      humidityMin: 85,
+      humidityMax: 90,
+    };
+  }
+
+  return {
+    ...baseRule,
+    maturityPreset: 'mature_green',
+    tempMin: 10.0,
+    tempMax: 13.0,
+    humidityMin: 90,
+    humidityMax: 95,
+  };
+}
+
 export function evaluateRoomStatus(
   room: StorageRoom,
   rule: CropThresholdRule
@@ -70,7 +116,7 @@ export function evaluateRoomStatus(
     return {
       severity: 'critical',
       primaryMetric: 'gas',
-      statusLabel: 'CRITICAL: gas index',
+      statusLabel: 'CRITICAL: C2H4 limit',
       tempState,
       humidityState,
       co2State,
@@ -94,7 +140,7 @@ export function evaluateRoomStatus(
     return {
       severity: 'warning',
       primaryMetric: 'co2',
-      statusLabel: 'WARNING: CO2',
+      statusLabel: 'WARNING: CO2 limit',
       tempState,
       humidityState,
       co2State,
@@ -106,7 +152,7 @@ export function evaluateRoomStatus(
     return {
       severity: 'warning',
       primaryMetric: 'gas',
-      statusLabel: 'WARNING: gas rising',
+      statusLabel: 'WARNING: C2H4 rising',
       tempState,
       humidityState,
       co2State,
@@ -130,8 +176,8 @@ export function sortRoomsBySeverity(
   rules: Record<CropType, CropThresholdRule>
 ): StorageRoom[] {
   return [...rooms].sort((a, b) => {
-    const evalA = evaluateRoomStatus(a, rules[a.crop]);
-    const evalB = evaluateRoomStatus(b, rules[b.crop]);
+    const evalA = evaluateRoomStatus(a, resolveRoomRule(a, rules));
+    const evalB = evaluateRoomStatus(b, resolveRoomRule(b, rules));
     const diff = SEVERITY_RANK[evalA.severity] - SEVERITY_RANK[evalB.severity];
     if (diff !== 0) return diff;
     return a.name.localeCompare(b.name);
@@ -164,16 +210,17 @@ export function validateThresholdRule(
   }
 
   if (!Number.isFinite(rule.co2Max) || rule.co2Max <= 100) {
-    errors.co2Max = 'CO2 max must be greater than 100 ppm.';
+    errors.co2Max = 'CO2 ventilation limit must be greater than 100 ppm.';
     if (!errors.summary) {
-      errors.summary = 'Error: CO2 max must be greater than 100 ppm.';
+      errors.summary = 'Error: CO2 ventilation limit must be greater than 100 ppm.';
     }
   }
 
-  if (!Number.isFinite(rule.gasIndexMax) || rule.gasIndexMax <= 0.2) {
-    errors.gasIndexMax = 'Gas index max must be greater than 0.2.';
+  if (!Number.isFinite(rule.gasIndexMax) || rule.gasIndexMax < 10) {
+    errors.gasIndexMax = 'Ethylene (C2H4) ventilation limit must be at least 10 ppm.';
     if (!errors.summary) {
-      errors.summary = 'Error: Gas index max must be greater than 0.2.';
+      errors.summary =
+        'Error: Ethylene (C2H4) ventilation limit must be at least 10 ppm.';
     }
   }
 
@@ -268,7 +315,7 @@ export function syncAlertsWithRooms(
   }
 
   for (const room of rooms) {
-    const rule = rules[room.crop];
+    const rule = resolveRoomRule(room, rules);
     const evaluation = evaluateRoomStatus(room, rule);
 
     if (evaluation.severity === 'in_range' || !evaluation.primaryMetric) {
@@ -296,22 +343,31 @@ export function syncAlertsWithRooms(
           : evaluation.tempState === 'above'
             ? ', accelerated ripening risk'
             : ', chilling injury risk';
-      message = `${room.name} temperature ${direction} range (${room.tempC.toFixed(1)} °C${riskNote})`;
+      const ventParts: string[] = [];
+      if (evaluation.co2State === 'above') {
+        ventParts.push(`CO2 ${Math.round(room.co2Ppm)} ppm`);
+      }
+      if (evaluation.gasState === 'above') {
+        ventParts.push(`C2H4 ${Math.round(room.gasIndex)} ppm`);
+      }
+      const ventSuffix =
+        ventParts.length > 0 ? `; ${ventParts.join(', ')}` : '';
+      message = `${room.name} temperature ${direction} range (${room.tempC.toFixed(1)} °C${riskNote}${ventSuffix})`;
     } else if (evaluation.primaryMetric === 'humidity') {
       typeLabel =
         evaluation.humidityState === 'below'
-          ? 'Humidity near limit'
+          ? 'Humidity below range'
           : 'Humidity high';
       message = `${room.name} humidity outside ${rule.humidityMin}-${rule.humidityMax}%`;
     } else if (evaluation.primaryMetric === 'co2') {
-      typeLabel = 'CO2 elevated';
-      message = `${room.name} CO2 above ${rule.co2Max} ppm`;
+      typeLabel = 'CO2 ventilation limit';
+      message = `${room.name} CO2 ${Math.round(room.co2Ppm)} ppm above ${Math.round(rule.co2Max)} ppm ventilation limit`;
     } else if (evaluation.primaryMetric === 'gas') {
       typeLabel =
         evaluation.gasState === 'above'
-          ? 'Spoilage gas high'
-          : 'Spoilage gas rising';
-      message = `${room.name} spoilage gas index ${room.gasIndex.toFixed(1)}`;
+          ? 'Ethylene (C2H4) high'
+          : 'Ethylene (C2H4) rising';
+      message = `${room.name} ethylene (C2H4) ${Math.round(room.gasIndex)} ppm vs <= ${Math.round(rule.gasIndexMax)} ppm ventilation limit`;
     }
 
     nextAlerts.push({
@@ -348,15 +404,37 @@ export function projectScenarioImpact(
   const durationFactor = Math.min(2.2, durationHours / 12);
   const loadStress = Math.max(0, (compressorLoadPct - 70) / 30);
 
+  // Compute facility-weighted RRL baseline postharvest loss range across active rooms
+  let minSum = 0;
+  let maxSum = 0;
+  let roomCount = 0;
+  for (const room of rooms) {
+    const band =
+      room.crop === 'Broccoli'
+        ? RRL_BASELINE_LOSS_BANDS.Broccoli
+        : room.maturityPreset === 'firm_ripe'
+          ? RRL_BASELINE_LOSS_BANDS.tomato_firm_ripe
+          : RRL_BASELINE_LOSS_BANDS.tomato_mature_green;
+    minSum += band.min;
+    maxSum += band.max;
+    roomCount += 1;
+  }
+  const avgBaselineMin = roomCount > 0 ? minSum / roomCount : 15.0;
+  const avgBaselineMax = roomCount > 0 ? maxSum / roomCount : 22.0;
+  const baselineLossMidPct = Number(
+    ((avgBaselineMin + avgBaselineMax) / 2).toFixed(1)
+  );
+  const baselineLossRangeLabel = `${avgBaselineMin.toFixed(1)}% - ${avgBaselineMax.toFixed(1)}%`;
+
   let baseTempDelta = ambientOffsetC * 0.35;
   let baseRisk = 6 + ambientOffsetC * 2.5 + loadStress * 8;
 
   if (scenario === 'equipment_failure') {
     baseTempDelta += 2.6 * durationFactor + loadStress * 1.1;
-    baseRisk += 32 * durationFactor;
+    baseRisk += 28 * durationFactor + baselineLossMidPct * 0.35;
   } else if (scenario === 'harvest_glut') {
     baseTempDelta += 1.1 * durationFactor + loadStress * 0.6;
-    baseRisk += 18 * durationFactor;
+    baseRisk += 16 * durationFactor + baselineLossMidPct * 0.2;
   } else {
     baseTempDelta = Math.max(-0.4, ambientOffsetC * 0.15);
     baseRisk = Math.max(2, 4 + Math.max(0, ambientOffsetC) * 1.4);
@@ -365,7 +443,7 @@ export function projectScenarioImpact(
   let breaching = 0;
   for (const room of rooms) {
     if (!room.online) continue;
-    const rule = rules[room.crop];
+    const rule = resolveRoomRule(room, rules);
     const projectedTemp =
       scenario === 'normal'
         ? (rule.tempMin + rule.tempMax) / 2 + baseTempDelta
@@ -382,12 +460,18 @@ export function projectScenarioImpact(
       : -Number(
           Math.min(6, Math.max(0.5, (spoilageRiskPct / 100) * 4.8)).toFixed(1)
         );
+  const lossDeltaVsBaselinePct = Number(
+    (spoilageRiskPct - baselineLossMidPct).toFixed(1)
+  );
 
   return {
     spoilageRiskPct,
     shelfLifeDeltaDays,
     projectedBreachRooms: breaching,
     peakTempDeltaC: Number(baseTempDelta.toFixed(1)),
+    baselineLossMidPct,
+    baselineLossRangeLabel,
+    lossDeltaVsBaselinePct,
   };
 }
 
@@ -403,15 +487,15 @@ export function applyScenarioToRooms(
   const loadBoost = Math.max(0, (compressorLoadPct - 75) / 25);
 
   return rooms.map((room) => {
-    const rule = rules[room.crop];
+    const rule = resolveRoomRule(room, rules);
     const midTemp = (rule.tempMin + rule.tempMax) / 2;
     const midHum = (rule.humidityMin + rule.humidityMax) / 2;
 
     if (scenario === 'normal') {
       const nextTemp = Number((midTemp + ambientOffsetC * 0.1).toFixed(1));
       const nextHum = Number(midHum.toFixed(1));
-      const nextCo2 = Math.round(rule.co2Max * 0.48);
-      const nextGas = Number((rule.gasIndexMax * 0.38).toFixed(1));
+      const nextCo2 = Math.round(rule.co2Max * 0.8);
+      const nextEthylene = Math.round(rule.gasIndexMax * 0.35);
       return {
         ...room,
         online: true,
@@ -419,7 +503,7 @@ export function applyScenarioToRooms(
         tempC: nextTemp,
         humidityPct: nextHum,
         co2Ppm: nextCo2,
-        gasIndex: nextGas,
+        gasIndex: nextEthylene,
         gasRising: false,
         breachDurationMin: 0,
         compressorMode: 'auto',
@@ -429,8 +513,8 @@ export function applyScenarioToRooms(
             ...pt,
             tempC: Number((nextTemp + drift).toFixed(1)),
             humidityPct: Number((nextHum + drift * 2).toFixed(1)),
-            co2Ppm: Math.round(nextCo2 + drift * 40),
-            gasIndex: Number(Math.max(0.3, nextGas + drift * 0.15).toFixed(1)),
+            co2Ppm: Math.round(nextCo2 + drift * 24),
+            gasIndex: Math.max(15, Math.round(nextEthylene + drift * 18)),
           };
         }),
       };
@@ -447,10 +531,10 @@ export function applyScenarioToRooms(
         Math.max(72, midHum - (isPrimaryFault ? 7.5 : 3.2) * durationScale).toFixed(1)
       );
       const nextCo2 = Math.round(
-        rule.co2Max * (isPrimaryFault ? 1.12 : 0.78)
+        rule.co2Max * (isPrimaryFault ? 1.15 : 0.88)
       );
-      const nextGas = Number(
-        (rule.gasIndexMax * (isPrimaryFault ? 1.25 : 0.82)).toFixed(1)
+      const nextEthylene = Math.round(
+        rule.gasIndexMax * (isPrimaryFault ? 1.18 : 0.72)
       );
       return {
         ...room,
@@ -458,33 +542,35 @@ export function applyScenarioToRooms(
         tempC: nextTemp,
         humidityPct: nextHum,
         co2Ppm: nextCo2,
-        gasIndex: nextGas,
+        gasIndex: nextEthylene,
         gasRising: isPrimaryFault,
         breachDurationMin: isPrimaryFault ? Math.round(durationHours * 6) : 12,
         compressorMode: isPrimaryFault ? 'boost' : 'auto',
         history24h: room.history24h.map((pt, idx, arr) => {
           const progress = idx / Math.max(1, arr.length - 1);
+          const startCo2 = Math.round(rule.co2Max * 0.78);
+          const startEth = Math.round(rule.gasIndexMax * 0.35);
           return {
             ...pt,
             tempC: Number((midTemp + deltaC * progress).toFixed(1)),
             humidityPct: Number(
               (midHum - (midHum - nextHum) * progress).toFixed(1)
             ),
-            co2Ppm: Math.round(rule.co2Max * 0.5 + (nextCo2 - rule.co2Max * 0.5) * progress),
-            gasIndex: Number((0.8 + (nextGas - 0.8) * progress).toFixed(1)),
+            co2Ppm: Math.round(startCo2 + (nextCo2 - startCo2) * progress),
+            gasIndex: Math.round(startEth + (nextEthylene - startEth) * progress),
           };
         }),
       };
     }
 
-    // harvest_glut: elevated respiration (CO2 & gas) and moderate thermal load
+    // harvest_glut: elevated respiration (CO2 & C2H4 ppm) and moderate thermal load
     const deltaC = 0.9 * durationScale + ambientOffsetC * 0.25 + loadBoost * 0.5;
     const nextTemp = Number((rule.tempMax - 0.1 + deltaC * 0.6).toFixed(1));
     const nextHum = Number(
       Math.min(99, rule.humidityMax + 1.8 * durationScale).toFixed(1)
     );
     const nextCo2 = Math.round(rule.co2Max * (1.14 + loadBoost * 0.08));
-    const nextGas = Number((rule.gasIndexMax * 1.12).toFixed(1));
+    const nextEthylene = Math.round(rule.gasIndexMax * 1.12);
 
     return {
       ...room,
@@ -493,18 +579,20 @@ export function applyScenarioToRooms(
       tempC: nextTemp,
       humidityPct: nextHum,
       co2Ppm: nextCo2,
-      gasIndex: nextGas,
+      gasIndex: nextEthylene,
       gasRising: true,
       breachDurationMin: Math.round(durationHours * 4),
       compressorMode: 'boost',
       history24h: room.history24h.map((pt, idx, arr) => {
         const progress = idx / Math.max(1, arr.length - 1);
+        const startCo2 = Math.round(rule.co2Max * 0.8);
+        const startEth = Math.round(rule.gasIndexMax * 0.45);
         return {
           ...pt,
           tempC: Number((midTemp + (nextTemp - midTemp) * progress).toFixed(1)),
           humidityPct: Number((midHum + (nextHum - midHum) * progress).toFixed(1)),
-          co2Ppm: Math.round(rule.co2Max * 0.55 + (nextCo2 - rule.co2Max * 0.55) * progress),
-          gasIndex: Number((0.9 + (nextGas - 0.9) * progress).toFixed(1)),
+          co2Ppm: Math.round(startCo2 + (nextCo2 - startCo2) * progress),
+          gasIndex: Math.round(startEth + (nextEthylene - startEth) * progress),
         };
       }),
     };
@@ -535,7 +623,7 @@ export function computeFacilityKpis(
   ).length;
 
   const roomsInRangeCount = rooms.filter(
-    (r) => evaluateRoomStatus(r, rules[r.crop]).severity === 'in_range'
+    (r) => evaluateRoomStatus(r, resolveRoomRule(r, rules)).severity === 'in_range'
   ).length;
   const offlineRoomsCount = rooms.filter((r) => !r.online).length;
 
@@ -546,7 +634,7 @@ export function computeFacilityKpis(
   for (const batch of activeBatches) {
     const room = rooms.find((r) => r.id === batch.roomId);
     const roomEval = room
-      ? evaluateRoomStatus(room, rules[room.crop])
+      ? evaluateRoomStatus(room, resolveRoomRule(room, rules))
       : {
           severity: 'in_range' as const,
           primaryMetric: null,

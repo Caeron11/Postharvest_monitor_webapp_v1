@@ -83,8 +83,12 @@ export function DualTrendChart({
   const solidMax = Math.max(...solidVals, targetMax) + (solidKey === 'tempC' ? 1.2 : 120);
   const solidSpan = Math.max(0.1, solidMax - solidMin);
 
-  const dashedMin = Math.min(...dashedVals) - (dashedKey === 'humidityPct' ? 4 : 0.6);
-  const dashedMax = Math.max(...dashedVals) + (dashedKey === 'humidityPct' ? 4 : 0.8);
+  const dashedMin = Math.max(
+    0,
+    Math.min(...dashedVals) - (dashedKey === 'humidityPct' ? 4 : 25)
+  );
+  const dashedMax =
+    Math.max(...dashedVals) + (dashedKey === 'humidityPct' ? 4 : 25);
   const dashedSpan = Math.max(0.1, dashedMax - dashedMin);
 
   const xAt = (idx: number) =>
